@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v1.1.2  - CYCLE_END aur EA_START/EA_STOP event styling.
   v1.1.1  - Header no longer wraps on narrow phones: last-update moved into
             the status strip. Demo flags reset properly on save.
   v1.1.0  - Settings sheet (URL-hash config), demo mode, skeleton states,
@@ -113,6 +114,8 @@ button{font-family:var(--mono)}
 .t-TP_HIT .ev-mark{background:var(--buy)}       .t-TP_HIT .ev-type{color:var(--buy)}
 .t-DD_STAGE .ev-mark{background:var(--sell)}    .t-DD_STAGE .ev-type{color:var(--sell)}
 .t-CYCLE_START .ev-mark{background:var(--amber)}.t-CYCLE_START .ev-type{color:var(--amber)}
+.t-CYCLE_END .ev-mark{background:var(--warn)}   .t-CYCLE_END .ev-type{color:var(--warn)}
+.t-EA_START .ev-mark,.t-EA_STOP .ev-mark{background:var(--line)}
 .t-SR .ev-mark{background:var(--amber)}         .t-SR .ev-type{color:var(--amber)}
 .t-TRADE_OPEN .ev-mark{background:#3a7bd5}      .t-TRADE_OPEN .ev-type{color:#6ea8ff}
 .t-PENDING_SET .ev-mark{background:var(--amber-dim)}
@@ -228,7 +231,7 @@ button{font-family:var(--mono)}
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v1.1.0</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v1.1.2</p>
 
 <!-- SETTINGS -->
 <div class="sheet" id="sheet">
