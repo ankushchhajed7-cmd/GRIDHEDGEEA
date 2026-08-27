@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v1.2.0  - RTDB URL aur account number ab file mein hardcoded hain —
+            app kholte hi connected. ⚙ se abhi bhi override ho sakta hai.
   v1.1.2  - CYCLE_END aur EA_START/EA_STOP event styling.
   v1.1.1  - Header no longer wraps on narrow phones: last-update moved into
             the status strip. Demo flags reset properly on save.
@@ -231,7 +233,7 @@ button{font-family:var(--mono)}
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v1.1.2</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v1.2.0</p>
 
 <!-- SETTINGS -->
 <div class="sheet" id="sheet">
@@ -257,8 +259,8 @@ button{font-family:var(--mono)}
 <script>
 /* ============ DEFAULTS — edit once, or use the ⚙ sheet ============ */
 const DEFAULTS = {
-  HOST : "https://YOURPROJECT-default-rtdb.firebaseio.com",
-  ACCT : "12345678",
+  HOST : "https://forexdiagnosis-default-rtdb.asia-southeast1.firebasedatabase.app",
+  ACCT : "433468654",
   AUTH : "",
   NODE : "gh",
   POLL : 4000,
