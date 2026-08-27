@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v1.1.1  - Header no longer wraps on narrow phones: last-update moved into
+            the status strip. Demo flags reset properly on save.
   v1.1.0  - Settings sheet (URL-hash config), demo mode, skeleton states,
             new-event vibrate + notification, account strip, better errors.
   v1.0.0  - First build: signal, chain ladder, money tiles, DD rail, feed.
@@ -38,9 +40,9 @@ button{font-family:var(--mono)}
   display:flex; align-items:center; gap:8px;
   padding:14px 0 8px;
 }
-.brand{font-size:15px; letter-spacing:.14em; color:var(--amber)}
-.brand span{color:var(--muted); font-size:9px; letter-spacing:.2em; display:block; margin-top:2px}
-.top-right{margin-left:auto; display:flex; align-items:center; gap:7px}
+.brand{font-size:15px; letter-spacing:.14em; color:var(--amber); white-space:nowrap}
+.brand span{color:var(--muted); font-size:9px; letter-spacing:.18em; display:block; margin-top:2px; white-space:nowrap}
+.top-right{margin-left:auto; display:flex; align-items:center; gap:7px; flex:none}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
 .dot.on{background:var(--buy);box-shadow:0 0 8px var(--buy);animation:pulse 2s infinite}
 .dot.stale{background:var(--warn);box-shadow:0 0 8px var(--warn)}
@@ -54,9 +56,10 @@ button{font-family:var(--mono)}
 .btn:active{background:var(--amber-dim)}
 .btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 .strip{
-  display:flex; gap:10px; font-size:9px; letter-spacing:.14em; color:var(--muted);
+  display:flex; flex-wrap:wrap; gap:4px 10px; font-size:9px; letter-spacing:.14em; color:var(--muted);
   padding-bottom:9px; border-bottom:1px solid var(--line); text-transform:uppercase;
 }
+.strip span{white-space:nowrap}
 .strip b{color:var(--text); font-weight:400}
 .strip .demo{color:var(--warn)}
 
@@ -149,11 +152,10 @@ button{font-family:var(--mono)}
 <header class="top">
   <div>
     <h1 class="brand">GRIDHEDGEEA</h1>
-    <span>QUANT TERMINAL · MOBILE</span>
+    <span>QUANT TERMINAL</span>
   </div>
   <div class="top-right">
     <span class="dot off" id="dot"></span>
-    <span class="age" id="age">—</span>
     <button class="btn" id="refresh" type="button">SYNC</button>
     <button class="btn" id="gear" type="button" aria-label="Settings">⚙</button>
   </div>
@@ -163,6 +165,7 @@ button{font-family:var(--mono)}
   <span>ACCT <b id="sAcct">—</b></span>
   <span>SYM <b id="sSym">—</b></span>
   <span>EA <b id="sVer">—</b></span>
+  <span>UPD <b class="age" id="age">—</b></span>
   <span class="demo" id="sDemo"></span>
 </div>
 
@@ -334,6 +337,7 @@ function renderLive(d){
   if(!d){
     $("signal").textContent = "NO DATA";
     $("signal").className = "signal-word sig-NONE";
+    $("sym").textContent = "—"; $("sSym").textContent = "—"; $("sVer").textContent = "—";
     skeletonChain(6); renderStages("OK");
     return;
   }
@@ -503,6 +507,7 @@ $("save").addEventListener("click", () => {
   CFG.ACCT = $("fAcct").value.trim() || DEFAULTS.ACCT;
   CFG.AUTH = $("fAuth").value.trim();
   CFG.NODE = $("fNode").value.trim() || "gh";
+  if(configured()) CFG.DEMO = false;   // real feed wins over demo
   writeHash(CFG); closeSheet(); lastTs = 0; firstLoad = true; start();
 });
 $("demoBtn").addEventListener("click", () => {
