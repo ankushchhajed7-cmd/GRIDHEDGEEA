@@ -1,0 +1,19 @@
+{
+  "name": "GRIDHEDGEEA Quant Terminal",
+  "short_name": "GRIDHEDGE",
+  "description": "Live monitoring for the GRIDHEDGEEA hedge-chain EA on MT5",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#07080a",
+  "theme_color": "#07080a",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

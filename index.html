@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GRIDHEDGEEA — Quant Terminal</title>
+<meta name="theme-color" content="#07080a">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<!--
+  GRIDHEDGEEA Mobile Dashboard — v1.0.0
+  Single file, vanilla JS, no build step. Edit CFG below, commit, done.
+-->
+<style>
+:root{
+  --bg:#07080a; --panel:#0e1013; --panel2:#121519; --line:#1e232a;
+  --amber:#ffb000; --amber-dim:#6b4a00; --buy:#00e08a; --sell:#ff4d4d;
+  --text:#e8e2d6; --muted:#697180; --warn:#ffd166;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono","Roboto Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text); font-family:var(--mono);
+  font-size:13px; line-height:1.45; padding:0 12px 40px;
+  max-width:560px; margin:0 auto;
+  padding-bottom:calc(40px + env(safe-area-inset-bottom));
+}
+h1,h2,h3{margin:0;font-weight:700}
+
+/* ---------- header ---------- */
+.top{
+  position:sticky; top:0; z-index:5; background:var(--bg);
+  display:flex; align-items:center; gap:8px;
+  padding:14px 0 10px; border-bottom:1px solid var(--line);
+}
+.brand{font-size:15px; letter-spacing:.14em; color:var(--amber)}
+.brand span{color:var(--muted); font-size:9px; letter-spacing:.2em; display:block; margin-top:2px}
+.top-right{margin-left:auto; display:flex; align-items:center; gap:8px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.dot.on{background:var(--buy);box-shadow:0 0 8px var(--buy);animation:pulse 2s infinite}
+.dot.stale{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+.dot.off{background:var(--sell)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.age{font-size:10px;color:var(--muted);letter-spacing:.06em}
+.btn{
+  background:var(--panel2); border:1px solid var(--line); color:var(--amber);
+  font-family:var(--mono); font-size:11px; padding:5px 9px; border-radius:3px; cursor:pointer;
+}
+.btn:active{background:var(--amber-dim)}
+.btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+/* ---------- panels ---------- */
+.card{background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:12px; margin-top:10px}
+.label{font-size:9px; letter-spacing:.22em; color:var(--muted); text-transform:uppercase}
+.row{display:flex; align-items:baseline; gap:8px}
+.spread{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
+
+/* ---------- signal ---------- */
+.signal-word{font-size:38px; line-height:1; letter-spacing:.04em; font-weight:700; margin-top:6px}
+.sig-BUY{color:var(--buy)} .sig-SELL{color:var(--sell)} .sig-NONE{color:var(--muted)}
+.sym{font-size:11px;color:var(--muted);letter-spacing:.1em}
+.adx-wrap{margin-top:14px}
+.adx-bar{height:6px;background:#15181d;border-radius:3px;overflow:hidden;margin-top:5px}
+.adx-fill{height:100%;background:var(--amber);width:0;transition:width .4s ease}
+.adx-fill.choppy{background:var(--muted)}
+
+/* ---------- chain ladder (signature) ---------- */
+.chain{display:flex; gap:3px; margin-top:10px; align-items:flex-end; height:34px}
+.link{flex:1; border-radius:2px; background:#15181d; border:1px solid var(--line); height:14px; position:relative}
+.link.buy{background:var(--buy); border-color:var(--buy); height:30px}
+.link.sell{background:var(--sell); border-color:var(--sell); height:30px}
+.link.pend{background:transparent; border:1px dashed var(--amber); height:22px}
+.chain-meta{display:flex; justify-content:space-between; margin-top:8px; font-size:11px}
+
+/* ---------- tiles ---------- */
+.tiles{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:4px; margin-top:10px; overflow:hidden}
+.tile{background:var(--panel); padding:10px 11px}
+.tile .val{font-size:17px; margin-top:3px; letter-spacing:.02em}
+.pos{color:var(--buy)} .neg{color:var(--sell)} .neutral{color:var(--text)}
+
+/* ---------- dd stages ---------- */
+.stages{display:flex; gap:3px; margin-top:10px}
+.stage{flex:1; text-align:center; font-size:8px; letter-spacing:.06em; padding:6px 2px; border:1px solid var(--line); border-radius:2px; color:var(--muted); background:var(--panel2)}
+.stage.hit{border-color:var(--warn); color:var(--warn)}
+.stage.hit.crit{border-color:var(--sell); color:var(--sell); background:#1a0d0d}
+
+/* ---------- feed ---------- */
+.feed{margin-top:10px}
+.ev{display:flex; gap:9px; padding:9px 0; border-bottom:1px solid var(--line)}
+.ev:last-child{border-bottom:none}
+.ev-mark{width:3px; border-radius:2px; flex:none; background:var(--muted)}
+.ev-body{flex:1; min-width:0}
+.ev-top{display:flex; justify-content:space-between; gap:8px; align-items:baseline}
+.ev-type{font-size:9px; letter-spacing:.14em}
+.ev-time{font-size:9px; color:var(--muted); white-space:nowrap}
+.ev-msg{font-size:12px; color:var(--text); word-break:break-word; margin-top:2px}
+.t-TP_HIT .ev-mark,.t-TP_HIT .ev-type{background:var(--buy);color:var(--buy)}
+.t-TP_HIT .ev-type{background:none}
+.t-DD_STAGE .ev-mark{background:var(--sell)} .t-DD_STAGE .ev-type{color:var(--sell)}
+.t-CYCLE_START .ev-mark{background:var(--amber)} .t-CYCLE_START .ev-type{color:var(--amber)}
+.t-SR .ev-mark{background:var(--amber)} .t-SR .ev-type{color:var(--amber)}
+.t-TRADE_OPEN .ev-mark{background:#3a7bd5} .t-TRADE_OPEN .ev-type{color:#6ea8ff}
+.t-PENDING_SET .ev-mark{background:var(--amber-dim)} .t-PENDING_SET .ev-type{color:var(--amber-dim)}
+.t-ERROR .ev-mark{background:var(--sell)} .t-ERROR .ev-type{color:var(--sell)}
+
+/* ---------- states ---------- */
+.note{border:1px solid var(--amber-dim); background:#140f02; color:var(--warn); padding:11px; border-radius:4px; margin-top:10px; font-size:12px}
+.note code{color:var(--amber)}
+.empty{color:var(--muted); font-size:12px; padding:14px 0; text-align:center}
+.foot{text-align:center; color:var(--muted); font-size:9px; letter-spacing:.16em; margin-top:18px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div>
+    <h1 class="brand">GRIDHEDGEEA</h1>
+    <span>QUANT TERMINAL · MOBILE</span>
+  </div>
+  <div class="top-right">
+    <span class="dot off" id="dot"></span>
+    <span class="age" id="age">—</span>
+    <button class="btn" id="refresh" type="button">SYNC</button>
+  </div>
+</header>
+
+<div id="banner"></div>
+
+<!-- SIGNAL -->
+<section class="card">
+  <div class="spread">
+    <span class="label">Signal</span>
+    <span class="sym" id="sym">—</span>
+  </div>
+  <div class="signal-word sig-NONE" id="signal">—</div>
+  <div class="adx-wrap">
+    <div class="spread">
+      <span class="label">ADX</span>
+      <span id="adxTxt">— · —</span>
+    </div>
+    <div class="adx-bar"><div class="adx-fill" id="adxFill"></div></div>
+  </div>
+</section>
+
+<!-- CHAIN -->
+<section class="card">
+  <div class="spread">
+    <span class="label">Hedge chain</span>
+    <span id="chainCount">0 / 0</span>
+  </div>
+  <div class="chain" id="chain"></div>
+  <div class="chain-meta">
+    <span class="label">Last</span><span id="lastTrade">—</span>
+  </div>
+  <div class="chain-meta">
+    <span class="label">Pending</span><span id="pending">—</span>
+  </div>
+</section>
+
+<!-- MONEY -->
+<div class="tiles">
+  <div class="tile"><div class="label">Equity</div><div class="val" id="equity">—</div></div>
+  <div class="tile"><div class="label">Balance</div><div class="val" id="balance">—</div></div>
+  <div class="tile"><div class="label">Floating PnL</div><div class="val" id="pnl">—</div></div>
+  <div class="tile"><div class="label">Basket TP</div><div class="val" id="btp">—</div></div>
+  <div class="tile"><div class="label">Drawdown %</div><div class="val" id="ddPct">—</div></div>
+  <div class="tile"><div class="label">Drawdown $</div><div class="val" id="ddUsd">—</div></div>
+</div>
+
+<!-- DD STAGES -->
+<section class="card">
+  <span class="label">Protection stage</span>
+  <div class="stages" id="stages"></div>
+</section>
+
+<!-- STATS -->
+<div class="tiles">
+  <div class="tile"><div class="label">Cycles done</div><div class="val" id="cycles">—</div></div>
+  <div class="tile"><div class="label">Win rate</div><div class="val" id="winRate">—</div></div>
+  <div class="tile"><div class="label">Won / Lost</div><div class="val" id="wl">—</div></div>
+  <div class="tile"><div class="label">Closed profit</div><div class="val" id="tprofit">—</div></div>
+</div>
+
+<!-- FEED -->
+<section class="card feed">
+  <div class="spread"><span class="label">Activity</span><span class="age" id="evCount">—</span></div>
+  <div id="feed"><div class="empty">Waiting for the first event.</div></div>
+</section>
+
+<p class="foot">GRIDHEDGEEA DASHBOARD v1.0.0</p>
+
+<script>
+/* ================= CONFIG — edit these four lines ================= */
+const CFG = {
+  HOST : "https://YOURPROJECT-default-rtdb.firebaseio.com", // same Firebase project as SamuSignal Pro
+  NODE : "gh",
+  ACCT : "12345678",   // MT5 account number the EA runs on
+  AUTH : "",           // read token; leave "" if ".read": true
+  POLL : 4000,         // ms
+  EVENTS: 120
+};
+/* ================================================================= */
+
+const $ = id => document.getElementById(id);
+const q = (p, first) => CFG.AUTH ? (first ? "?auth=" : "&auth=") + CFG.AUTH : "";
+const base = () => CFG.HOST.replace(/\/+$/, "") + "/" + CFG.NODE + "/" + CFG.ACCT;
+
+const STAGES = ["OK", "WARNING", "BLOCK", "CLOSE_LOSSES", "LIQUIDATE"];
+const STAGE_LABEL = { OK: "OK", WARNING: "WARN", BLOCK: "BLOCK", CLOSE_LOSSES: "CLOSE", LIQUIDATE: "LIQ" };
+
+let lastTs = 0, timer = null;
+
+function money(v, sign) {
+  if (v === undefined || v === null || isNaN(v)) return "—";
+  const s = (sign && v > 0 ? "+" : "") + Number(v).toFixed(2);
+  return s;
+}
+function ago(sec) {
+  if (!sec) return "—";
+  const d = Math.max(0, Math.floor(Date.now() / 1000 - sec));
+  if (d < 60) return d + "s ago";
+  if (d < 3600) return Math.floor(d / 60) + "m ago";
+  if (d < 86400) return Math.floor(d / 3600) + "h ago";
+  return Math.floor(d / 86400) + "d ago";
+}
+function cls(v) { return v > 0 ? "val pos" : v < 0 ? "val neg" : "val neutral"; }
+
+async function get(path, params) {
+  const url = base() + path + ".json" + (params ? "?" + params + q(false) : q(true));
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error("HTTP " + r.status + " on " + path);
+  return r.json();
+}
+
+function banner(html) { $("banner").innerHTML = html ? '<div class="note">' + html + '</div>' : ""; }
+
+function renderLive(d) {
+  if (!d) {
+    $("signal").textContent = "NO DATA";
+    $("signal").className = "signal-word sig-NONE";
+    return;
+  }
+  lastTs = d.ts || 0;
+  $("sym").textContent = d.sym || "—";
+  const sig = d.signal || "NONE";
+  $("signal").textContent = sig;
+  $("signal").className = "signal-word sig-" + (["BUY", "SELL"].includes(sig) ? sig : "NONE");
+
+  const adx = Number(d.adx || 0);
+  $("adxTxt").textContent = adx.toFixed(1) + " · " + (d.trending ? "TRENDING" : "CHOPPY");
+  const fill = $("adxFill");
+  fill.style.width = Math.min(100, adx / 50 * 100) + "%";
+  fill.className = "adx-fill" + (d.trending ? "" : " choppy");
+
+  // chain ladder
+  const n = Number(d.chain || 0), max = Number(d.chainMax || 0);
+  $("chainCount").textContent = n + " / " + (max || "—");
+  const startBuy = (d.lastDir === "BUY") === (n % 2 === 1);
+  let h = "";
+  for (let i = 0; i < Math.max(max, n, 4); i++) {
+    if (i < n) h += '<div class="link ' + ((startBuy ? i % 2 === 0 : i % 2 === 1) ? "buy" : "sell") + '"></div>';
+    else if (i === n && d.pending && d.pending !== "NONE") h += '<div class="link pend"></div>';
+    else h += '<div class="link"></div>';
+  }
+  $("chain").innerHTML = h;
+  $("lastTrade").textContent = d.lastDir && d.lastDir !== "-" ? d.lastDir + " @ " + d.lastPrice : "—";
+  $("pending").textContent = d.pending || "NONE";
+
+  $("equity").textContent = money(d.equity);
+  $("balance").textContent = money(d.balance);
+  $("pnl").textContent = money(d.pnl, true); $("pnl").className = cls(Number(d.pnl || 0));
+  $("btp").textContent = money(d.basketTP);
+  $("ddPct").textContent = (Number(d.ddPct || 0)).toFixed(2) + "%";
+  $("ddPct").className = "val" + (Number(d.ddPct || 0) > 0 ? " neg" : "");
+  $("ddUsd").textContent = money(d.ddUsd);
+  $("ddUsd").className = "val" + (Number(d.ddUsd || 0) > 0 ? " neg" : "");
+
+  const idx = Math.max(0, STAGES.indexOf(d.stage || "OK"));
+  $("stages").innerHTML = STAGES.map((s, i) =>
+    '<div class="stage' + (i <= idx && idx > 0 ? " hit" : "") + (i >= 2 && i <= idx ? " crit" : "") + '">' + STAGE_LABEL[s] + '</div>'
+  ).join("");
+
+  if (d.weekend) banner("Weekend block active — EA is holding until Monday 7:00 AM IST.");
+  else banner("");
+}
+
+function renderStats(s) {
+  if (!s) return;
+  $("cycles").textContent = s.cycles ?? "—";
+  $("winRate").textContent = s.winRate !== undefined ? Number(s.winRate).toFixed(1) + "%" : "—";
+  $("wl").textContent = (s.wins ?? 0) + " / " + (s.losses ?? 0);
+  $("tprofit").textContent = money(s.profit, true);
+  $("tprofit").className = cls(Number(s.profit || 0));
+}
+
+function renderEvents(obj) {
+  const list = obj ? Object.keys(obj).sort().reverse().map(k => obj[k]) : [];
+  $("evCount").textContent = list.length ? list.length + " events" : "—";
+  if (!list.length) { $("feed").innerHTML = '<div class="empty">Waiting for the first event.</div>'; return; }
+  $("feed").innerHTML = list.map(e => {
+    const type = (e.type || "INFO");
+    return '<div class="ev t-' + type + '">' +
+      '<div class="ev-mark"></div>' +
+      '<div class="ev-body">' +
+        '<div class="ev-top"><span class="ev-type">' + type + '</span>' +
+        '<span class="ev-time">' + ago(e.ts) + '</span></div>' +
+        '<div class="ev-msg">' + String(e.msg || "").replace(/[<>]/g, "") + '</div>' +
+      '</div></div>';
+  }).join("");
+}
+
+function heartbeat() {
+  const dot = $("dot"), age = $("age");
+  if (!lastTs) { dot.className = "dot off"; age.textContent = "no feed"; return; }
+  const d = Date.now() / 1000 - lastTs;
+  dot.className = "dot " + (d < 20 ? "on" : d < 120 ? "stale" : "off");
+  age.textContent = ago(lastTs);
+}
+
+async function sync() {
+  if (CFG.HOST.includes("YOURPROJECT")) {
+    banner('Set <code>CFG.HOST</code> and <code>CFG.ACCT</code> at the top of this file, then reload.');
+    return;
+  }
+  try {
+    const [live, events, stats] = await Promise.all([
+      get("/live"),
+      get("/events", 'orderBy="$key"&limitToLast=' + CFG.EVENTS),
+      get("/stats").catch(() => null)
+    ]);
+    renderLive(live);
+    renderEvents(events);
+    renderStats(stats);
+    heartbeat();
+  } catch (err) {
+    $("dot").className = "dot off";
+    banner("Can't reach the database: " + err.message + ". Check the URL, the account number, and that <code>.read</code> is allowed for this node.");
+  }
+}
+
+function start() { stop(); sync(); timer = setInterval(sync, CFG.POLL); }
+function stop() { if (timer) clearInterval(timer); timer = null; }
+
+$("refresh").addEventListener("click", sync);
+document.addEventListener("visibilitychange", () => document.hidden ? stop() : start());
+setInterval(heartbeat, 1000);
+start();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>
