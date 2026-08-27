@@ -9,8 +9,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
-  GRIDHEDGEEA Mobile Dashboard — v1.0.0
-  Single file, vanilla JS, no build step. Edit CFG below, commit, done.
+  GRIDHEDGEEA Mobile Dashboard
+  v1.1.0  - Settings sheet (URL-hash config), demo mode, skeleton states,
+            new-event vibrate + notification, account strip, better errors.
+  v1.0.0  - First build: signal, chain ladder, money tiles, DD rail, feed.
 -->
 <style>
 :root{
@@ -28,16 +30,17 @@ body{
   padding-bottom:calc(40px + env(safe-area-inset-bottom));
 }
 h1,h2,h3{margin:0;font-weight:700}
+button{font-family:var(--mono)}
 
 /* ---------- header ---------- */
 .top{
   position:sticky; top:0; z-index:5; background:var(--bg);
   display:flex; align-items:center; gap:8px;
-  padding:14px 0 10px; border-bottom:1px solid var(--line);
+  padding:14px 0 8px;
 }
 .brand{font-size:15px; letter-spacing:.14em; color:var(--amber)}
 .brand span{color:var(--muted); font-size:9px; letter-spacing:.2em; display:block; margin-top:2px}
-.top-right{margin-left:auto; display:flex; align-items:center; gap:8px}
+.top-right{margin-left:auto; display:flex; align-items:center; gap:7px}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
 .dot.on{background:var(--buy);box-shadow:0 0 8px var(--buy);animation:pulse 2s infinite}
 .dot.stale{background:var(--warn);box-shadow:0 0 8px var(--warn)}
@@ -46,15 +49,20 @@ h1,h2,h3{margin:0;font-weight:700}
 .age{font-size:10px;color:var(--muted);letter-spacing:.06em}
 .btn{
   background:var(--panel2); border:1px solid var(--line); color:var(--amber);
-  font-family:var(--mono); font-size:11px; padding:5px 9px; border-radius:3px; cursor:pointer;
+  font-size:11px; padding:5px 9px; border-radius:3px; cursor:pointer;
 }
 .btn:active{background:var(--amber-dim)}
 .btn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.strip{
+  display:flex; gap:10px; font-size:9px; letter-spacing:.14em; color:var(--muted);
+  padding-bottom:9px; border-bottom:1px solid var(--line); text-transform:uppercase;
+}
+.strip b{color:var(--text); font-weight:400}
+.strip .demo{color:var(--warn)}
 
 /* ---------- panels ---------- */
 .card{background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:12px; margin-top:10px}
 .label{font-size:9px; letter-spacing:.22em; color:var(--muted); text-transform:uppercase}
-.row{display:flex; align-items:baseline; gap:8px}
 .spread{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
 
 /* ---------- signal ---------- */
@@ -66,13 +74,14 @@ h1,h2,h3{margin:0;font-weight:700}
 .adx-fill{height:100%;background:var(--amber);width:0;transition:width .4s ease}
 .adx-fill.choppy{background:var(--muted)}
 
-/* ---------- chain ladder (signature) ---------- */
+/* ---------- chain ladder ---------- */
 .chain{display:flex; gap:3px; margin-top:10px; align-items:flex-end; height:34px}
-.link{flex:1; border-radius:2px; background:#15181d; border:1px solid var(--line); height:14px; position:relative}
+.link{flex:1; border-radius:2px; background:#15181d; border:1px solid var(--line); height:14px}
 .link.buy{background:var(--buy); border-color:var(--buy); height:30px}
 .link.sell{background:var(--sell); border-color:var(--sell); height:30px}
 .link.pend{background:transparent; border:1px dashed var(--amber); height:22px}
-.chain-meta{display:flex; justify-content:space-between; margin-top:8px; font-size:11px}
+.chain-meta{display:flex; justify-content:space-between; margin-top:8px; font-size:11px; gap:8px}
+.chain-meta span:last-child{text-align:right; word-break:break-word}
 
 /* ---------- tiles ---------- */
 .tiles{display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:4px; margin-top:10px; overflow:hidden}
@@ -90,26 +99,48 @@ h1,h2,h3{margin:0;font-weight:700}
 .feed{margin-top:10px}
 .ev{display:flex; gap:9px; padding:9px 0; border-bottom:1px solid var(--line)}
 .ev:last-child{border-bottom:none}
+.ev.fresh{animation:flash 1.2s ease}
+@keyframes flash{0%{background:#1b1403}100%{background:transparent}}
 .ev-mark{width:3px; border-radius:2px; flex:none; background:var(--muted)}
 .ev-body{flex:1; min-width:0}
 .ev-top{display:flex; justify-content:space-between; gap:8px; align-items:baseline}
-.ev-type{font-size:9px; letter-spacing:.14em}
+.ev-type{font-size:9px; letter-spacing:.14em; color:var(--muted)}
 .ev-time{font-size:9px; color:var(--muted); white-space:nowrap}
 .ev-msg{font-size:12px; color:var(--text); word-break:break-word; margin-top:2px}
-.t-TP_HIT .ev-mark,.t-TP_HIT .ev-type{background:var(--buy);color:var(--buy)}
-.t-TP_HIT .ev-type{background:none}
-.t-DD_STAGE .ev-mark{background:var(--sell)} .t-DD_STAGE .ev-type{color:var(--sell)}
-.t-CYCLE_START .ev-mark{background:var(--amber)} .t-CYCLE_START .ev-type{color:var(--amber)}
-.t-SR .ev-mark{background:var(--amber)} .t-SR .ev-type{color:var(--amber)}
-.t-TRADE_OPEN .ev-mark{background:#3a7bd5} .t-TRADE_OPEN .ev-type{color:#6ea8ff}
-.t-PENDING_SET .ev-mark{background:var(--amber-dim)} .t-PENDING_SET .ev-type{color:var(--amber-dim)}
-.t-ERROR .ev-mark{background:var(--sell)} .t-ERROR .ev-type{color:var(--sell)}
+.t-TP_HIT .ev-mark{background:var(--buy)}       .t-TP_HIT .ev-type{color:var(--buy)}
+.t-DD_STAGE .ev-mark{background:var(--sell)}    .t-DD_STAGE .ev-type{color:var(--sell)}
+.t-CYCLE_START .ev-mark{background:var(--amber)}.t-CYCLE_START .ev-type{color:var(--amber)}
+.t-SR .ev-mark{background:var(--amber)}         .t-SR .ev-type{color:var(--amber)}
+.t-TRADE_OPEN .ev-mark{background:#3a7bd5}      .t-TRADE_OPEN .ev-type{color:#6ea8ff}
+.t-PENDING_SET .ev-mark{background:var(--amber-dim)}
+.t-ERROR .ev-mark{background:var(--sell)}       .t-ERROR .ev-type{color:var(--sell)}
 
 /* ---------- states ---------- */
 .note{border:1px solid var(--amber-dim); background:#140f02; color:var(--warn); padding:11px; border-radius:4px; margin-top:10px; font-size:12px}
+.note.bad{border-color:#5a1e1e; background:#160c0c; color:#ff8a8a}
 .note code{color:var(--amber)}
+.note button{margin-top:8px}
 .empty{color:var(--muted); font-size:12px; padding:14px 0; text-align:center}
 .foot{text-align:center; color:var(--muted); font-size:9px; letter-spacing:.16em; margin-top:18px}
+
+/* ---------- settings sheet ---------- */
+.sheet{position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:20; display:none; align-items:flex-end; justify-content:center}
+.sheet.open{display:flex}
+.sheet-in{
+  background:var(--panel); border:1px solid var(--line); border-bottom:none;
+  border-radius:8px 8px 0 0; padding:16px 14px calc(20px + env(safe-area-inset-bottom));
+  width:100%; max-width:560px; max-height:88vh; overflow:auto;
+}
+.field{margin-top:12px}
+.field input{
+  width:100%; margin-top:5px; background:#0a0c0f; border:1px solid var(--line);
+  color:var(--text); font-family:var(--mono); font-size:13px; padding:9px 10px; border-radius:3px;
+}
+.field input:focus{outline:none;border-color:var(--amber)}
+.sheet-actions{display:flex; gap:8px; margin-top:16px}
+.sheet-actions .btn{flex:1; padding:10px; font-size:12px}
+.btn.primary{background:var(--amber); color:#07080a; border-color:var(--amber); font-weight:700}
+.hint{font-size:10px; color:var(--muted); margin-top:10px; line-height:1.5}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -124,8 +155,16 @@ h1,h2,h3{margin:0;font-weight:700}
     <span class="dot off" id="dot"></span>
     <span class="age" id="age">—</span>
     <button class="btn" id="refresh" type="button">SYNC</button>
+    <button class="btn" id="gear" type="button" aria-label="Settings">⚙</button>
   </div>
 </header>
+
+<div class="strip">
+  <span>ACCT <b id="sAcct">—</b></span>
+  <span>SYM <b id="sSym">—</b></span>
+  <span>EA <b id="sVer">—</b></span>
+  <span class="demo" id="sDemo"></span>
+</div>
 
 <div id="banner"></div>
 
@@ -149,15 +188,11 @@ h1,h2,h3{margin:0;font-weight:700}
 <section class="card">
   <div class="spread">
     <span class="label">Hedge chain</span>
-    <span id="chainCount">0 / 0</span>
+    <span id="chainCount">— / —</span>
   </div>
   <div class="chain" id="chain"></div>
-  <div class="chain-meta">
-    <span class="label">Last</span><span id="lastTrade">—</span>
-  </div>
-  <div class="chain-meta">
-    <span class="label">Pending</span><span id="pending">—</span>
-  </div>
+  <div class="chain-meta"><span class="label">Last</span><span id="lastTrade">—</span></div>
+  <div class="chain-meta"><span class="label">Pending</span><span id="pending">—</span></div>
 </section>
 
 <!-- MONEY -->
@@ -190,168 +225,305 @@ h1,h2,h3{margin:0;font-weight:700}
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v1.0.0</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v1.1.0</p>
+
+<!-- SETTINGS -->
+<div class="sheet" id="sheet">
+  <div class="sheet-in">
+    <div class="spread"><span class="label">Connection</span><button class="btn" id="close" type="button">CLOSE</button></div>
+    <div class="field"><span class="label">Realtime DB URL</span>
+      <input id="fHost" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://project-default-rtdb.firebaseio.com"></div>
+    <div class="field"><span class="label">MT5 account</span>
+      <input id="fAcct" inputmode="numeric" placeholder="12345678"></div>
+    <div class="field"><span class="label">Read token (optional)</span>
+      <input id="fAuth" autocapitalize="off" spellcheck="false" placeholder="leave empty if .read is true"></div>
+    <div class="field"><span class="label">Root node</span>
+      <input id="fNode" autocapitalize="off" spellcheck="false" placeholder="gh"></div>
+    <div class="sheet-actions">
+      <button class="btn" id="demoBtn" type="button">DEMO DATA</button>
+      <button class="btn" id="alertBtn" type="button">ALERTS</button>
+      <button class="btn primary" id="save" type="button">SAVE</button>
+    </div>
+    <p class="hint">Settings live in this page's URL, so add the app to your home screen after saving and it reopens connected. Demo data fills the screen with a fake chain so you can check the layout before the EA is wired.</p>
+  </div>
+</div>
 
 <script>
-/* ================= CONFIG — edit these four lines ================= */
-const CFG = {
-  HOST : "https://YOURPROJECT-default-rtdb.firebaseio.com", // same Firebase project as SamuSignal Pro
+/* ============ DEFAULTS — edit once, or use the ⚙ sheet ============ */
+const DEFAULTS = {
+  HOST : "https://YOURPROJECT-default-rtdb.firebaseio.com",
+  ACCT : "12345678",
+  AUTH : "",
   NODE : "gh",
-  ACCT : "12345678",   // MT5 account number the EA runs on
-  AUTH : "",           // read token; leave "" if ".read": true
-  POLL : 4000,         // ms
+  POLL : 4000,
   EVENTS: 120
 };
 /* ================================================================= */
 
 const $ = id => document.getElementById(id);
-const q = (p, first) => CFG.AUTH ? (first ? "?auth=" : "&auth=") + CFG.AUTH : "";
-const base = () => CFG.HOST.replace(/\/+$/, "") + "/" + CFG.NODE + "/" + CFG.ACCT;
+const STAGES = ["OK","WARNING","BLOCK","CLOSE_LOSSES","LIQUIDATE"];
+const STAGE_LABEL = {OK:"OK",WARNING:"WARN",BLOCK:"BLOCK",CLOSE_LOSSES:"CLOSE",LIQUIDATE:"LIQ"};
 
-const STAGES = ["OK", "WARNING", "BLOCK", "CLOSE_LOSSES", "LIQUIDATE"];
-const STAGE_LABEL = { OK: "OK", WARNING: "WARN", BLOCK: "BLOCK", CLOSE_LOSSES: "CLOSE", LIQUIDATE: "LIQ" };
+let CFG = readHash(), lastTs = 0, timer = null, lastEventTs = 0, firstLoad = true;
 
-let lastTs = 0, timer = null;
-
-function money(v, sign) {
-  if (v === undefined || v === null || isNaN(v)) return "—";
-  const s = (sign && v > 0 ? "+" : "") + Number(v).toFixed(2);
-  return s;
+function readHash(){
+  const p = new URLSearchParams(location.hash.slice(1));
+  return {
+    HOST : p.get("h") || DEFAULTS.HOST,
+    ACCT : p.get("a") || DEFAULTS.ACCT,
+    AUTH : p.get("k") || DEFAULTS.AUTH,
+    NODE : p.get("n") || DEFAULTS.NODE,
+    DEMO : p.get("demo") === "1",
+    POLL : DEFAULTS.POLL,
+    EVENTS: DEFAULTS.EVENTS
+  };
 }
-function ago(sec) {
-  if (!sec) return "—";
-  const d = Math.max(0, Math.floor(Date.now() / 1000 - sec));
-  if (d < 60) return d + "s ago";
-  if (d < 3600) return Math.floor(d / 60) + "m ago";
-  if (d < 86400) return Math.floor(d / 3600) + "h ago";
-  return Math.floor(d / 86400) + "d ago";
+function writeHash(c){
+  const p = new URLSearchParams();
+  if(c.HOST) p.set("h", c.HOST);
+  if(c.ACCT) p.set("a", c.ACCT);
+  if(c.AUTH) p.set("k", c.AUTH);
+  if(c.NODE && c.NODE !== "gh") p.set("n", c.NODE);
+  if(c.DEMO) p.set("demo","1");
+  location.hash = p.toString();
 }
-function cls(v) { return v > 0 ? "val pos" : v < 0 ? "val neg" : "val neutral"; }
+const configured = () => CFG.HOST && !CFG.HOST.includes("YOURPROJECT") && CFG.ACCT && CFG.ACCT !== "12345678";
+const base = () => CFG.HOST.replace(/\/+$/,"") + "/" + CFG.NODE + "/" + CFG.ACCT;
+const q = first => CFG.AUTH ? (first ? "?auth=" : "&auth=") + encodeURIComponent(CFG.AUTH) : "";
 
-async function get(path, params) {
+function money(v, sign){
+  if(v === undefined || v === null || isNaN(v)) return "—";
+  return (sign && v > 0 ? "+" : "") + Number(v).toFixed(2);
+}
+function ago(sec){
+  if(!sec) return "—";
+  const d = Math.max(0, Math.floor(Date.now()/1000 - sec));
+  if(d < 60) return d + "s ago";
+  if(d < 3600) return Math.floor(d/60) + "m ago";
+  if(d < 86400) return Math.floor(d/3600) + "h ago";
+  return Math.floor(d/86400) + "d ago";
+}
+const cls = v => v > 0 ? "val pos" : v < 0 ? "val neg" : "val neutral";
+const esc = s => String(s ?? "").replace(/[<>&]/g, m => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[m]));
+
+function banner(html, bad){
+  $("banner").innerHTML = html ? '<div class="note' + (bad ? " bad" : "") + '">' + html + '</div>' : "";
+}
+
+async function get(path, params){
   const url = base() + path + ".json" + (params ? "?" + params + q(false) : q(true));
-  const r = await fetch(url, { cache: "no-store" });
-  if (!r.ok) throw new Error("HTTP " + r.status + " on " + path);
+  const r = await fetch(url, {cache:"no-store"});
+  if(!r.ok) throw new Error(r.status === 401 ? "permission denied — check the read rule or token" : "HTTP " + r.status);
   return r.json();
 }
 
-function banner(html) { $("banner").innerHTML = html ? '<div class="note">' + html + '</div>' : ""; }
+/* ---------------- rendering ---------------- */
+function skeletonChain(n){
+  let h = "";
+  for(let i = 0; i < (n || 6); i++) h += '<div class="link"></div>';
+  $("chain").innerHTML = h;
+}
+function renderStages(stage){
+  const idx = Math.max(0, STAGES.indexOf(stage || "OK"));
+  $("stages").innerHTML = STAGES.map((s,i) =>
+    '<div class="stage' + (i <= idx && idx > 0 ? " hit" : "") + (i >= 2 && i <= idx ? " crit" : "") + '">' + STAGE_LABEL[s] + '</div>'
+  ).join("");
+}
 
-function renderLive(d) {
-  if (!d) {
+function renderLive(d){
+  if(!d){
     $("signal").textContent = "NO DATA";
     $("signal").className = "signal-word sig-NONE";
+    skeletonChain(6); renderStages("OK");
     return;
   }
   lastTs = d.ts || 0;
   $("sym").textContent = d.sym || "—";
+  $("sSym").textContent = d.sym || "—";
+  $("sVer").textContent = d.ver ? "v" + d.ver : "—";
+
   const sig = d.signal || "NONE";
   $("signal").textContent = sig;
-  $("signal").className = "signal-word sig-" + (["BUY", "SELL"].includes(sig) ? sig : "NONE");
+  $("signal").className = "signal-word sig-" + (["BUY","SELL"].includes(sig) ? sig : "NONE");
 
   const adx = Number(d.adx || 0);
   $("adxTxt").textContent = adx.toFixed(1) + " · " + (d.trending ? "TRENDING" : "CHOPPY");
-  const fill = $("adxFill");
-  fill.style.width = Math.min(100, adx / 50 * 100) + "%";
-  fill.className = "adx-fill" + (d.trending ? "" : " choppy");
+  $("adxFill").style.width = Math.min(100, adx / 50 * 100) + "%";
+  $("adxFill").className = "adx-fill" + (d.trending ? "" : " choppy");
 
-  // chain ladder
   const n = Number(d.chain || 0), max = Number(d.chainMax || 0);
   $("chainCount").textContent = n + " / " + (max || "—");
+  const hasPending = d.pending && d.pending !== "NONE" && d.pending !== "-";
   const startBuy = (d.lastDir === "BUY") === (n % 2 === 1);
   let h = "";
-  for (let i = 0; i < Math.max(max, n, 4); i++) {
-    if (i < n) h += '<div class="link ' + ((startBuy ? i % 2 === 0 : i % 2 === 1) ? "buy" : "sell") + '"></div>';
-    else if (i === n && d.pending && d.pending !== "NONE") h += '<div class="link pend"></div>';
-    else h += '<div class="link"></div>';
+  for(let i = 0; i < Math.max(max, n + 1, 6); i++){
+    if(i < n)                       h += '<div class="link ' + ((startBuy ? i % 2 === 0 : i % 2 === 1) ? "buy" : "sell") + '"></div>';
+    else if(i === n && hasPending)  h += '<div class="link pend"></div>';
+    else                            h += '<div class="link"></div>';
   }
   $("chain").innerHTML = h;
   $("lastTrade").textContent = d.lastDir && d.lastDir !== "-" ? d.lastDir + " @ " + d.lastPrice : "—";
-  $("pending").textContent = d.pending || "NONE";
+  $("pending").textContent = hasPending ? d.pending : "NONE";
 
-  $("equity").textContent = money(d.equity);
+  $("equity").textContent  = money(d.equity);
   $("balance").textContent = money(d.balance);
-  $("pnl").textContent = money(d.pnl, true); $("pnl").className = cls(Number(d.pnl || 0));
+  $("pnl").textContent = money(d.pnl, true);  $("pnl").className = cls(Number(d.pnl || 0));
   $("btp").textContent = money(d.basketTP);
-  $("ddPct").textContent = (Number(d.ddPct || 0)).toFixed(2) + "%";
+  $("ddPct").textContent = Number(d.ddPct || 0).toFixed(2) + "%";
   $("ddPct").className = "val" + (Number(d.ddPct || 0) > 0 ? " neg" : "");
   $("ddUsd").textContent = money(d.ddUsd);
   $("ddUsd").className = "val" + (Number(d.ddUsd || 0) > 0 ? " neg" : "");
 
-  const idx = Math.max(0, STAGES.indexOf(d.stage || "OK"));
-  $("stages").innerHTML = STAGES.map((s, i) =>
-    '<div class="stage' + (i <= idx && idx > 0 ? " hit" : "") + (i >= 2 && i <= idx ? " crit" : "") + '">' + STAGE_LABEL[s] + '</div>'
-  ).join("");
-
-  if (d.weekend) banner("Weekend block active — EA is holding until Monday 7:00 AM IST.");
-  else banner("");
+  renderStages(d.stage);
+  banner(d.weekend ? "Weekend block active — EA holds until Monday 7:00 AM IST." : "");
 }
 
-function renderStats(s) {
-  if (!s) return;
-  $("cycles").textContent = s.cycles ?? "—";
-  $("winRate").textContent = s.winRate !== undefined ? Number(s.winRate).toFixed(1) + "%" : "—";
-  $("wl").textContent = (s.wins ?? 0) + " / " + (s.losses ?? 0);
-  $("tprofit").textContent = money(s.profit, true);
-  $("tprofit").className = cls(Number(s.profit || 0));
+function renderStats(s){
+  if(!s) return;
+  $("cycles").textContent   = s.cycles ?? "—";
+  $("winRate").textContent  = s.winRate !== undefined ? Number(s.winRate).toFixed(1) + "%" : "—";
+  $("wl").textContent       = (s.wins ?? 0) + " / " + (s.losses ?? 0);
+  $("tprofit").textContent  = money(s.profit, true);
+  $("tprofit").className    = cls(Number(s.profit || 0));
 }
 
-function renderEvents(obj) {
+function renderEvents(obj){
   const list = obj ? Object.keys(obj).sort().reverse().map(k => obj[k]) : [];
   $("evCount").textContent = list.length ? list.length + " events" : "—";
-  if (!list.length) { $("feed").innerHTML = '<div class="empty">Waiting for the first event.</div>'; return; }
-  $("feed").innerHTML = list.map(e => {
-    const type = (e.type || "INFO");
-    return '<div class="ev t-' + type + '">' +
-      '<div class="ev-mark"></div>' +
-      '<div class="ev-body">' +
-        '<div class="ev-top"><span class="ev-type">' + type + '</span>' +
-        '<span class="ev-time">' + ago(e.ts) + '</span></div>' +
-        '<div class="ev-msg">' + String(e.msg || "").replace(/[<>]/g, "") + '</div>' +
-      '</div></div>';
+  if(!list.length){ $("feed").innerHTML = '<div class="empty">No events yet. They appear the moment the EA pushes one.</div>'; return; }
+
+  const newest = list[0];
+  const isNew = newest && newest.ts > lastEventTs;
+  if(isNew && !firstLoad) alertNew(newest);
+  if(newest) lastEventTs = Math.max(lastEventTs, newest.ts || 0);
+
+  $("feed").innerHTML = list.map((e,i) => {
+    const type = e.type || "INFO";
+    return '<div class="ev t-' + esc(type) + (i === 0 && isNew && !firstLoad ? " fresh" : "") + '">' +
+      '<div class="ev-mark"></div><div class="ev-body">' +
+      '<div class="ev-top"><span class="ev-type">' + esc(type) + '</span><span class="ev-time">' + ago(e.ts) + '</span></div>' +
+      '<div class="ev-msg">' + esc(e.msg) + '</div></div></div>';
   }).join("");
+  firstLoad = false;
 }
 
-function heartbeat() {
+function alertNew(e){
+  if(navigator.vibrate) navigator.vibrate(e.type === "DD_STAGE" ? [60,60,60] : 40);
+  if(!("Notification" in window) || Notification.permission !== "granted") return;
+  if(!["TP_HIT","DD_STAGE","CYCLE_START","SR"].includes(e.type)) return;
+  const body = e.msg || "";
+  if(navigator.serviceWorker && navigator.serviceWorker.ready)
+    navigator.serviceWorker.ready.then(r => r.showNotification("GRIDHEDGEEA · " + e.type, {body, tag:"gh", icon:"icon.svg"})).catch(()=>{});
+}
+
+function heartbeat(){
   const dot = $("dot"), age = $("age");
-  if (!lastTs) { dot.className = "dot off"; age.textContent = "no feed"; return; }
-  const d = Date.now() / 1000 - lastTs;
+  if(!lastTs){ dot.className = "dot off"; age.textContent = configured() || CFG.DEMO ? "no feed" : "not set"; return; }
+  const d = Date.now()/1000 - lastTs;
   dot.className = "dot " + (d < 20 ? "on" : d < 120 ? "stale" : "off");
   age.textContent = ago(lastTs);
 }
 
-async function sync() {
-  if (CFG.HOST.includes("YOURPROJECT")) {
-    banner('Set <code>CFG.HOST</code> and <code>CFG.ACCT</code> at the top of this file, then reload.');
+/* ---------------- demo feed ---------------- */
+let demoTick = 0;
+function demoData(){
+  demoTick++;
+  const drift = Math.sin(demoTick / 6) * 18;
+  const now = Math.floor(Date.now()/1000);
+  const live = {
+    ts: now, sym:"XAUUSDm", ver:"1.00", signal:"BUY", adx: 27.4 + Math.sin(demoTick/9)*4,
+    trending:true, chain:4, chainMax:12, lastDir:"SELL", lastPrice:3412.55,
+    pending:"BUY STOP 3421.30", balance:1000, equity:1000 - 46.2 + drift,
+    pnl:-46.2 + drift, basketTP:18.5, ddPct:4.62, ddUsd:46.2, stage:"WARNING", weekend:false
+  };
+  const ev = [
+    {ts:now-40,   type:"PENDING_SET", msg:"BUY STOP @ 3421.30"},
+    {ts:now-180,  type:"TRADE_OPEN",  msg:"SELL 0.03 @ 3412.55"},
+    {ts:now-900,  type:"DD_STAGE",    msg:"DD WARNING at 4.62%"},
+    {ts:now-2400, type:"TP_HIT",      msg:"Basket TP hit, +21.40"},
+    {ts:now-2460, type:"CYCLE_START", msg:"New chain BUY @ 3390.10"},
+    {ts:now-8000, type:"SR",          msg:"Stop & Reverse to SELL"},
+    {ts:now-9000, type:"EA_START",    msg:"GRIDHEDGEEA started on XAUUSDm"}
+  ];
+  const obj = {}; ev.forEach((e,i) => obj["k" + String(999 - i).padStart(4,"0")] = e);
+  return [live, obj, {cycles:14, wins:11, losses:3, winRate:78.6, profit:236.85}];
+}
+
+/* ---------------- sync loop ---------------- */
+async function sync(){
+  $("sAcct").textContent = CFG.DEMO ? "DEMO" : (CFG.ACCT || "—");
+  $("sDemo").textContent = CFG.DEMO ? "· DEMO DATA" : "";
+
+  if(CFG.DEMO){
+    const [live, ev, st] = demoData();
+    renderLive(live); renderEvents(ev); renderStats(st); heartbeat();
+    banner('Demo data — real feed is off. Open ⚙ and turn demo off when the EA is pushing.');
     return;
   }
-  try {
+  if(!configured()){
+    renderLive(null);
+    banner('Not connected yet. Open ⚙ and enter your Realtime DB URL and MT5 account number.<br><button class="btn" onclick="openSheet()">OPEN SETTINGS</button>');
+    return;
+  }
+  try{
     const [live, events, stats] = await Promise.all([
       get("/live"),
       get("/events", 'orderBy="$key"&limitToLast=' + CFG.EVENTS),
       get("/stats").catch(() => null)
     ]);
-    renderLive(live);
-    renderEvents(events);
-    renderStats(stats);
-    heartbeat();
-  } catch (err) {
+    if(!live) banner('Connected, but <code>/live</code> is empty. The EA has not pushed yet — check the URL whitelist in MT5.');
+    else banner("");
+    renderLive(live); renderEvents(events); renderStats(stats); heartbeat();
+  }catch(err){
     $("dot").className = "dot off";
-    banner("Can't reach the database: " + err.message + ". Check the URL, the account number, and that <code>.read</code> is allowed for this node.");
+    banner("Can't reach the database: " + esc(err.message) + ".", true);
   }
 }
+function start(){ stop(); sync(); timer = setInterval(sync, CFG.POLL); }
+function stop(){ if(timer) clearInterval(timer); timer = null; }
 
-function start() { stop(); sync(); timer = setInterval(sync, CFG.POLL); }
-function stop() { if (timer) clearInterval(timer); timer = null; }
+/* ---------------- settings sheet ---------------- */
+function openSheet(){
+  $("fHost").value = CFG.HOST.includes("YOURPROJECT") ? "" : CFG.HOST;
+  $("fAcct").value = CFG.ACCT === "12345678" ? "" : CFG.ACCT;
+  $("fAuth").value = CFG.AUTH;
+  $("fNode").value = CFG.NODE;
+  $("demoBtn").textContent = CFG.DEMO ? "DEMO OFF" : "DEMO DATA";
+  $("sheet").classList.add("open");
+}
+function closeSheet(){ $("sheet").classList.remove("open"); }
 
+$("gear").addEventListener("click", openSheet);
+$("close").addEventListener("click", closeSheet);
+$("sheet").addEventListener("click", e => { if(e.target === $("sheet")) closeSheet(); });
 $("refresh").addEventListener("click", sync);
+
+$("save").addEventListener("click", () => {
+  CFG.HOST = $("fHost").value.trim() || DEFAULTS.HOST;
+  CFG.ACCT = $("fAcct").value.trim() || DEFAULTS.ACCT;
+  CFG.AUTH = $("fAuth").value.trim();
+  CFG.NODE = $("fNode").value.trim() || "gh";
+  writeHash(CFG); closeSheet(); lastTs = 0; firstLoad = true; start();
+});
+$("demoBtn").addEventListener("click", () => {
+  CFG.DEMO = !CFG.DEMO; writeHash(CFG); closeSheet(); lastTs = 0; firstLoad = true; start();
+});
+$("alertBtn").addEventListener("click", () => {
+  if(!("Notification" in window)) return;
+  Notification.requestPermission().then(p => {
+    $("alertBtn").textContent = p === "granted" ? "ALERTS ON" : "ALERTS OFF";
+  });
+});
+
+window.addEventListener("hashchange", () => { CFG = readHash(); lastTs = 0; firstLoad = true; start(); });
 document.addEventListener("visibilitychange", () => document.hidden ? stop() : start());
 setInterval(heartbeat, 1000);
+
+skeletonChain(6); renderStages("OK");
 start();
 
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
-}
+if("serviceWorker" in navigator)
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
 </script>
 </body>
 </html>
