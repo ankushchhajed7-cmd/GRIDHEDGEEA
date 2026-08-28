@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v1.3.0  - Protection-stage rail hataya. Ab DD ko uske asli $ limit ke
+            against progress bar mein dikhaya jaata hai (EA se ddLimit aata hai).
   v1.2.0  - RTDB URL aur account number ab file mein hardcoded hain —
             app kholte hi connected. ⚙ se abhi bhi override ho sakta hai.
   v1.1.2  - CYCLE_END aur EA_START/EA_STOP event styling.
@@ -95,11 +97,12 @@ button{font-family:var(--mono)}
 .tile .val{font-size:17px; margin-top:3px; letter-spacing:.02em}
 .pos{color:var(--buy)} .neg{color:var(--sell)} .neutral{color:var(--text)}
 
-/* ---------- dd stages ---------- */
-.stages{display:flex; gap:3px; margin-top:10px}
-.stage{flex:1; text-align:center; font-size:8px; letter-spacing:.06em; padding:6px 2px; border:1px solid var(--line); border-radius:2px; color:var(--muted); background:var(--panel2)}
-.stage.hit{border-color:var(--warn); color:var(--warn)}
-.stage.hit.crit{border-color:var(--sell); color:var(--sell); background:#1a0d0d}
+/* ---------- dd limit bar ---------- */
+.ddbar{height:8px; background:#15181d; border-radius:4px; overflow:hidden; margin-top:8px; position:relative}
+.ddbar i{position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--amber-dim)}
+.ddfill{height:100%; width:0; background:var(--buy); transition:width .4s ease}
+.ddfill.warn{background:var(--warn)} .ddfill.crit{background:var(--sell)}
+.ddfoot{display:flex; justify-content:space-between; margin-top:6px; font-size:10px; color:var(--muted)}
 
 /* ---------- feed ---------- */
 .feed{margin-top:10px}
@@ -213,10 +216,14 @@ button{font-family:var(--mono)}
   <div class="tile"><div class="label">Drawdown $</div><div class="val" id="ddUsd">—</div></div>
 </div>
 
-<!-- DD STAGES -->
+<!-- DD LIMIT -->
 <section class="card">
-  <span class="label">Protection stage</span>
-  <div class="stages" id="stages"></div>
+  <div class="spread">
+    <span class="label">DD limit</span>
+    <span id="ddState">—</span>
+  </div>
+  <div class="ddbar"><i></i><div class="ddfill" id="ddFill"></div></div>
+  <div class="ddfoot"><span id="ddNow">—</span><span id="ddCap">—</span></div>
 </section>
 
 <!-- STATS -->
@@ -233,7 +240,7 @@ button{font-family:var(--mono)}
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v1.2.0</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v1.3.0</p>
 
 <!-- SETTINGS -->
 <div class="sheet" id="sheet">
@@ -269,8 +276,7 @@ const DEFAULTS = {
 /* ================================================================= */
 
 const $ = id => document.getElementById(id);
-const STAGES = ["OK","WARNING","BLOCK","CLOSE_LOSSES","LIQUIDATE"];
-const STAGE_LABEL = {OK:"OK",WARNING:"WARN",BLOCK:"BLOCK",CLOSE_LOSSES:"CLOSE",LIQUIDATE:"LIQ"};
+
 
 let CFG = readHash(), lastTs = 0, timer = null, lastEventTs = 0, firstLoad = true;
 
@@ -331,11 +337,25 @@ function skeletonChain(n){
   for(let i = 0; i < (n || 6); i++) h += '<div class="link"></div>';
   $("chain").innerHTML = h;
 }
-function renderStages(stage){
-  const idx = Math.max(0, STAGES.indexOf(stage || "OK"));
-  $("stages").innerHTML = STAGES.map((s,i) =>
-    '<div class="stage' + (i <= idx && idx > 0 ? " hit" : "") + (i >= 2 && i <= idx ? " crit" : "") + '">' + STAGE_LABEL[s] + '</div>'
-  ).join("");
+// DD ko uske $ limit ke against dikhata hai. Bar ke beech ki line = 50% (warning).
+function renderDD(ddUsd, limit, stage){
+  const dd = Math.max(0, Number(ddUsd || 0));
+  const cap = Number(limit || 0);
+  const fill = $("ddFill");
+
+  if(!cap){
+    fill.style.width = "0%"; fill.className = "ddfill";
+    $("ddState").textContent = "OFF";
+    $("ddNow").textContent = money(dd);
+    $("ddCap").textContent = "no limit set";
+    return;
+  }
+  const pct = Math.min(100, dd / cap * 100);
+  fill.style.width = pct + "%";
+  fill.className = "ddfill" + (pct >= 100 ? " crit" : pct >= 50 ? " warn" : "");
+  $("ddState").textContent = (stage === "LIQUIDATE" || pct >= 100) ? "LIMIT HIT" : pct >= 50 ? "WARNING" : "OK";
+  $("ddNow").textContent = money(dd) + "  (" + pct.toFixed(1) + "%)";
+  $("ddCap").textContent = "limit " + money(cap);
 }
 
 function renderLive(d){
@@ -343,7 +363,7 @@ function renderLive(d){
     $("signal").textContent = "NO DATA";
     $("signal").className = "signal-word sig-NONE";
     $("sym").textContent = "—"; $("sSym").textContent = "—"; $("sVer").textContent = "—";
-    skeletonChain(6); renderStages("OK");
+    skeletonChain(6); renderDD(0, 0, "OK");
     return;
   }
   lastTs = d.ts || 0;
@@ -383,7 +403,7 @@ function renderLive(d){
   $("ddUsd").textContent = money(d.ddUsd);
   $("ddUsd").className = "val" + (Number(d.ddUsd || 0) > 0 ? " neg" : "");
 
-  renderStages(d.stage);
+  renderDD(d.ddUsd, d.ddLimit, d.stage);
   banner(d.weekend ? "Weekend block active — EA holds until Monday 7:00 AM IST." : "");
 }
 
@@ -529,7 +549,7 @@ window.addEventListener("hashchange", () => { CFG = readHash(); lastTs = 0; firs
 document.addEventListener("visibilitychange", () => document.hidden ? stop() : start());
 setInterval(heartbeat, 1000);
 
-skeletonChain(6); renderStages("OK");
+skeletonChain(6); renderDD(0, 0, "OK");
 start();
 
 if("serviceWorker" in navigator)
