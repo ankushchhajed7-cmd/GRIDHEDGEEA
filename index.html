@@ -10,6 +10,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v1.9.0  - Per-account opening balance (number:LABEL:OPENING).
+            STALE warning: 2 min se purana data ho to screen halki
+            aur upar amber patti — purane numbers ab taaza nahi lagenge.
   v1.8.0  - MULTI-ACCOUNT: live + demo (ya jitne bhi) ek saath.
             Upar tabs mein har account ki equity/chain/status, tap karke switch.
   v1.7.0  - SIGNAL card mein STATUS row: EA ka block reason
@@ -224,6 +227,11 @@ button{font-family:var(--mono);font-weight:800}
 .note{margin-top:11px;padding:12px;border-radius:8px;font-size:12.5px;color:var(--warn);
   border:1px solid #6b5518;background:linear-gradient(160deg,#2a2008,#150f04);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 20px rgba(255,183,51,.14)}
+.stale-wrap{opacity:.42;filter:grayscale(.55)}
+.stalebar{margin-top:11px;padding:11px 12px;border-radius:8px;font-size:12.5px;font-weight:800;
+  color:#ffd166;border:1px solid #7a5a10;background:linear-gradient(160deg,#33260a,#1a1305);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 0 22px rgba(255,183,51,.22);
+  animation:blink 2s infinite}
 .note.bad{border-color:#7a2030;color:#ff9aab;background:linear-gradient(160deg,#2c0d15,#160709);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 0 20px rgba(255,79,109,.16)}
 .note code{color:var(--gold)}
@@ -279,6 +287,8 @@ button{font-family:var(--mono);font-weight:800}
 </div>
 
 <div class="tabs" id="tabs"></div>
+
+<div id="stale"></div>
 
 <div id="banner"></div>
 
@@ -355,7 +365,7 @@ button{font-family:var(--mono);font-weight:800}
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v1.8.0</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v1.9.0</p>
 
 <!-- SETTINGS -->
 <div class="sheet" id="sheet">
@@ -364,7 +374,7 @@ button{font-family:var(--mono);font-weight:800}
     <div class="field"><span class="label">Realtime DB URL</span>
       <input id="fHost" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://project-default-rtdb.firebaseio.com"></div>
     <div class="field"><span class="label">MT5 accounts</span>
-      <input id="fAcct" autocapitalize="off" spellcheck="false" placeholder="433468654:LIVE, 987654321:DEMO"></div>
+      <input id="fAcct" autocapitalize="off" spellcheck="false" placeholder="433468654:DEMO:5000, 987654321:LIVE:1000"></div>
     <div class="field"><span class="label">Read token (optional)</span>
       <input id="fAuth" autocapitalize="off" spellcheck="false" placeholder="leave empty if .read is true"></div>
     <div class="field"><span class="label">Root node</span>
@@ -376,7 +386,7 @@ button{font-family:var(--mono);font-weight:800}
       <button class="btn" id="alertBtn" type="button">ALERTS</button>
       <button class="btn primary" id="save" type="button">SAVE</button>
     </div>
-    <p class="hint">Ek se zyada account comma se alag karo, aur naam dene ke liye <code>number:LABEL</code> likho. Har account ka apna MT5 terminal + EA chahiye.<br><br>Settings live in this page's URL, so add the app to your home screen after saving and it reopens connected. Demo data fills the screen with a fake chain so you can check the layout before the EA is wired.</p>
+    <p class="hint">Ek se zyada account comma se alag karo: <code>number:LABEL:OPENING</code>. Opening balance na do to neeche wala global chalega. Har account ka apna MT5 terminal + EA chahiye.<br><br>Settings live in this page's URL, so add the app to your home screen after saving and it reopens connected. Demo data fills the screen with a fake chain so you can check the layout before the EA is wired.</p>
   </div>
 </div>
 
@@ -427,12 +437,19 @@ function writeHash(c){
 }
 const configured = () => CFG.HOST && !CFG.HOST.includes("YOURPROJECT") && accounts().length > 0;
 // "433468654:LIVE, 987654321:DEMO" -> [{id,label}, ...]
+// "433468654:DEMO:5000, 160123652:LIVE:1000" -> [{id,label,open}, ...]
+// Teesra hissa optional — na do to global OPENING BALANCE lagta hai.
 function accounts(){
   return String(CFG.ACCT || "").split(",").map(x => x.trim()).filter(Boolean).map(x => {
-    const [id, label] = x.split(":");
-    return { id: (id || "").trim(), label: (label || id || "").trim() };
+    const [id, label, open] = x.split(":");
+    return {
+      id: (id || "").trim(),
+      label: (label || id || "").trim(),
+      open: parseFloat(open) || 0
+    };
   }).filter(a => a.id);
 }
+const openBalance = () => active().open || Number(CFG.OPEN || 0);
 function active(){
   const a = accounts();
   return a[Math.min(CFG.IDX, a.length - 1)] || { id: "", label: "" };
@@ -563,7 +580,7 @@ function renderLive(d){
 let lastBalance = null;
 
 function renderPnl(events){
-  const open = Number(CFG.OPEN || 0);
+  const open = openBalance();
   $("openBal").textContent = money(open);
 
   if(lastBalance !== null){
@@ -638,11 +655,14 @@ async function renderTabs(){
   el.innerHTML = list.map((a, i) => {
     const d = snaps[i];
     const eq = d ? money(d.equity) : "—";
-    const sub = d ? ((d.chain || 0) + "/" + (d.chainMax || 0) + " · " + (d.blocked || "")) : "no feed";
+    const age2 = d && d.ts ? (Date.now()/1000 - d.ts) : 1e9;
+    const sub = !d ? "no feed"
+      : age2 > 120 ? "STALE " + ago(d.ts)
+      : ((d.chain || 0) + "/" + (d.chainMax || 0) + " · " + (d.blocked || ""));
     return '<div class="tab' + (i === CFG.IDX ? " on" : "") + '" data-i="' + i + '">' +
       '<div class="tname">' + esc(a.label) + '</div>' +
       '<div class="tval">' + eq + '</div>' +
-      '<div class="tsub">' + esc(sub) + '</div></div>';
+      '<div class="tsub" style="color:' + (age2 > 120 ? "var(--sell)" : "var(--dim)") + '">' + esc(sub) + '</div></div>';
   }).join("");
 
   el.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
@@ -651,12 +671,30 @@ async function renderTabs(){
   }));
 }
 
+// 2 min se purana data => poori screen halki + upar amber warning.
+// Purane numbers taaza dikhna sabse khatarnak cheez hai.
+function markStale(seconds){
+  const st = $("stale");
+  const old = seconds > 120;
+  document.body.classList.toggle("stale-wrap", old);
+  st.innerHTML = old
+    ? '<div class="stalebar">STALE — ye numbers ' + ago(lastTs).replace(" ago","") +
+      ' purane hain. EA push nahi kar raha (MT5 band, disconnect, ya EA hata hua).</div>'
+    : "";
+}
+
 function heartbeat(){
   const dot = $("dot"), age = $("age");
-  if(!lastTs){ dot.className = "dot off"; age.textContent = configured() || CFG.DEMO ? "no feed" : "not set"; return; }
+  if(!lastTs){
+    dot.className = "dot off";
+    age.textContent = configured() || CFG.DEMO ? "no feed" : "not set";
+    document.body.classList.remove("stale-wrap"); $("stale").innerHTML = "";
+    return;
+  }
   const d = Date.now()/1000 - lastTs;
   dot.className = "dot " + (d < 20 ? "on" : d < 120 ? "stale" : "off");
   age.textContent = ago(lastTs);
+  markStale(d);
 }
 
 /* ---------------- demo feed ---------------- */
