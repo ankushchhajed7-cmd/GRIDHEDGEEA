@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v1.6.0  - Chain card mein BREAKEVEN aur TP PRICE rows (average TP mode).
+            MANUAL_CLOSE events ka apna colour.
   v1.5.2  - Opening balance ab seedha tiles grid mein (pehla tile).
             Alag se lagayi gayi START/NET aur opening lines hata di.
             Drawdown % tile hataya — DD $ aur DD LIMIT bar kaafi hain.
@@ -138,6 +140,8 @@ button{font-family:var(--mono);font-weight:800}
 .chain-meta span:last-child{text-align:right;word-break:break-word;color:#fff}
 #chainCount{color:var(--cyan);font-size:15px;text-shadow:0 0 10px rgba(62,224,255,.5)}
 #pending{color:var(--amber);text-shadow:0 0 9px rgba(255,183,51,.5)}
+#bePrice{color:var(--violet);text-shadow:0 0 9px rgba(169,139,255,.5)}
+#tpPrice{color:var(--buy);text-shadow:0 0 10px rgba(18,247,160,.55)}
 
 /* ---------- tiles ---------- */
 .tiles{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);padding:1px}
@@ -188,6 +192,8 @@ button{font-family:var(--mono);font-weight:800}
 .t-TRADE_OPEN .ev-type{color:var(--blue)}
 .t-PENDING_SET .ev-mark{background:var(--gold)}
 .t-PENDING_SET .ev-type{color:var(--gold)}
+.t-MANUAL_CLOSE .ev-mark{background:var(--warn);box-shadow:0 0 10px var(--warn)}
+.t-MANUAL_CLOSE .ev-type{color:var(--warn)}
 .t-EA_START .ev-mark,.t-EA_STOP .ev-mark{background:#4a5568}
 .t-ERROR .ev-mark{background:var(--sell)} .t-ERROR .ev-type{color:var(--sell)}
 
@@ -276,6 +282,8 @@ button{font-family:var(--mono);font-weight:800}
   <div class="chain" id="chain"></div>
   <div class="chain-meta"><span class="label">Last</span><span id="lastTrade">—</span></div>
   <div class="chain-meta"><span class="label">Pending</span><span id="pending">—</span></div>
+  <div class="chain-meta"><span class="label">Breakeven</span><span id="bePrice">—</span></div>
+  <div class="chain-meta"><span class="label">TP price</span><span id="tpPrice">—</span></div>
 </section>
 
 <!-- MONEY -->
@@ -318,7 +326,7 @@ button{font-family:var(--mono);font-weight:800}
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v1.5.2</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v1.6.0</p>
 
 <!-- SETTINGS -->
 <div class="sheet" id="sheet">
@@ -479,11 +487,18 @@ function renderLive(d){
   $("lastTrade").textContent = d.lastDir && d.lastDir !== "-" ? d.lastDir + " @ " + d.lastPrice : "—";
   $("pending").textContent = hasPending ? d.pending : "NONE";
 
+  // average-TP mode: basket ka breakeven aur asli TP price
+  const be = Number(d.bePrice || 0), tpp = Number(d.tpPrice || 0);
+  $("bePrice").textContent = be > 0 ? be.toFixed(3) : (d.tpMode === "AVG" ? "fully hedged" : "—");
+  $("tpPrice").textContent = tpp > 0 ? tpp.toFixed(3) : "—";
+
   $("equity").textContent  = money(d.equity);
   $("balance").textContent = money(d.balance);
   lastBalance = Number(d.balance || 0);
   $("pnl").textContent = money(d.pnl, true);  $("pnl").className = cls(Number(d.pnl || 0));
-  $("btp").textContent = money(d.basketTP);
+  $("btp").textContent = (d.tpMode === "AVG")
+    ? "avg $" + Number(d.basketTP || 0).toFixed(2)
+    : money(d.basketTP);
   $("ddUsd").textContent = money(d.ddUsd);
   $("ddUsd").className = "val" + (Number(d.ddUsd || 0) > 0 ? " neg" : "");
 
