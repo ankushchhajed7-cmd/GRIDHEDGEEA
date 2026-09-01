@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v1.7.0  - SIGNAL card mein STATUS row: EA ka block reason
+            (WEEKEND / NEWS / SPREAD / DD LIMIT / ADX / COOLDOWN / READY).
   v1.6.0  - Chain card mein BREAKEVEN aur TP PRICE rows (average TP mode).
             MANUAL_CLOSE events ka apna colour.
   v1.5.2  - Opening balance ab seedha tiles grid mein (pehla tile).
@@ -117,6 +119,10 @@ button{font-family:var(--mono);font-weight:800}
 .sig-SELL{color:var(--sell);text-shadow:0 0 14px rgba(255,79,109,.65),0 0 40px rgba(255,79,109,.3)}
 .sig-NONE{color:#7b8698}
 .sym{font-size:12px;color:var(--cyan);letter-spacing:.1em;text-shadow:0 0 8px rgba(62,224,255,.45)}
+.statusrow{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:12px;
+  padding-top:10px;border-top:1px solid var(--line)}
+#blocked{font-size:14px;color:var(--warn);text-shadow:0 0 10px rgba(255,204,77,.55)}
+#blocked.ready{color:var(--buy);text-shadow:0 0 10px rgba(18,247,160,.6)}
 .adx-wrap{margin-top:14px}
 #adxTxt{color:#fff;text-shadow:0 0 8px rgba(255,255,255,.3)}
 .adx-bar,.ddbar{height:9px;border-radius:5px;overflow:hidden;margin-top:6px;position:relative;
@@ -264,6 +270,10 @@ button{font-family:var(--mono);font-weight:800}
     <span class="sym" id="sym">—</span>
   </div>
   <div class="signal-word sig-NONE" id="signal">—</div>
+  <div class="statusrow">
+    <span class="label">Status</span>
+    <span id="blocked">—</span>
+  </div>
   <div class="adx-wrap">
     <div class="spread">
       <span class="label">ADX</span>
@@ -326,7 +336,7 @@ button{font-family:var(--mono);font-weight:800}
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v1.6.0</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v1.7.0</p>
 
 <!-- SETTINGS -->
 <div class="sheet" id="sheet">
@@ -468,6 +478,14 @@ function renderLive(d){
   $("signal").textContent = sig;
   $("signal").className = "signal-word sig-" + (["BUY","SELL"].includes(sig) ? sig : "NONE");
 
+  // v2.0: EA seedha batata hai ki nayi chain kyun nahi khul rahi
+  const blk = d.blocked || "—";
+  const bEl = $("blocked");
+  bEl.textContent = (blk === "READY" || blk === "IN CHAIN")
+    ? blk + (d.spread ? "  ·  spread " + d.spread : "")
+    : blk;
+  bEl.className = (blk === "READY" || blk === "IN CHAIN") ? "ready" : "";
+
   const adx = Number(d.adx || 0);
   $("adxTxt").textContent = adx.toFixed(1) + " · " + (d.trending ? "TRENDING" : "CHOPPY");
   $("adxFill").style.width = Math.min(100, adx / 50 * 100) + "%";
@@ -589,7 +607,7 @@ function demoData(){
   const now = Math.floor(Date.now()/1000);
   const live = {
     ts: now, sym:"XAUUSDm", ver:"1.00", signal:"BUY", adx: 27.4 + Math.sin(demoTick/9)*4,
-    trending:true, chain:4, chainMax:12, lastDir:"SELL", lastPrice:3412.55,
+    trending:true, blocked:"IN CHAIN", spread:26, chain:4, chainMax:12, lastDir:"SELL", lastPrice:3412.55,
     pending:"BUY STOP 3421.30", balance:1000, equity:1000 - 46.2 + drift,
     pnl:-46.2 + drift, basketTP:18.5, ddPct:4.62, ddUsd:46.2, stage:"WARNING", weekend:false
   };
