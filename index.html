@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v1.5.0  - Today / Total profit tiles + opening-balance setting.
+            Events aur stats ab har 20s (live har 4s) — Firebase data bachta hai.
   v1.4.0  - Bold + colourful theme: glossy cards, per-section accent
             colours, glowing values, blinking pending link, no grey text.
   v1.3.0  - Protection-stage rail hataya. Ab DD ko uske asli $ limit ke
@@ -143,6 +145,12 @@ button{font-family:var(--mono);font-weight:800}
 .tile:nth-child(5) .label{color:var(--sell)}  .tile:nth-child(6) .label{color:var(--violet)}
 .pos{color:var(--buy)!important;text-shadow:0 0 12px rgba(18,247,160,.6)!important}
 .neg{color:var(--sell)!important;text-shadow:0 0 12px rgba(255,79,109,.6)!important}
+
+.t-pnl .tile:nth-child(1) .label{color:var(--gold)}
+.t-pnl .tile:nth-child(2) .label{color:var(--buy)}
+.t-pnl .val{font-size:22px}
+.pnlfoot{display:flex;justify-content:space-between;margin-top:6px;padding:0 3px;
+  font-size:11px;color:var(--dim)}
 
 /* ---------- dd bar ---------- */
 .ddbar i{position:absolute;left:50%;top:0;bottom:0;width:2px;background:rgba(255,204,77,.6);z-index:2}
@@ -288,6 +296,13 @@ button{font-family:var(--mono);font-weight:800}
   <div class="ddfoot"><span id="ddNow">—</span><span id="ddCap">—</span></div>
 </section>
 
+<!-- PROFIT -->
+<div class="tiles t-pnl">
+  <div class="tile"><div class="label">Today</div><div class="val" id="pToday">—</div></div>
+  <div class="tile"><div class="label">Total profit</div><div class="val" id="pTotal">—</div></div>
+</div>
+<div class="pnlfoot"><span id="pOpen">—</span><span id="pPct">—</span></div>
+
 <!-- STATS -->
 <div class="tiles">
   <div class="tile"><div class="label">Cycles done</div><div class="val" id="cycles">—</div></div>
@@ -302,7 +317,7 @@ button{font-family:var(--mono);font-weight:800}
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v1.4.0</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v1.5.0</p>
 
 <!-- SETTINGS -->
 <div class="sheet" id="sheet">
@@ -316,6 +331,8 @@ button{font-family:var(--mono);font-weight:800}
       <input id="fAuth" autocapitalize="off" spellcheck="false" placeholder="leave empty if .read is true"></div>
     <div class="field"><span class="label">Root node</span>
       <input id="fNode" autocapitalize="off" spellcheck="false" placeholder="gh"></div>
+    <div class="field"><span class="label">Opening balance</span>
+      <input id="fOpen" inputmode="decimal" placeholder="5000"></div>
     <div class="sheet-actions">
       <button class="btn" id="demoBtn" type="button">DEMO DATA</button>
       <button class="btn" id="alertBtn" type="button">ALERTS</button>
@@ -332,8 +349,10 @@ const DEFAULTS = {
   ACCT : "433468654",
   AUTH : "",
   NODE : "gh",
-  POLL : 4000,
-  EVENTS: 120
+  OPEN : 5000,      // account ka opening balance — total profit isi se nikalta hai
+  POLL : 4000,      // live snapshot
+  SLOW : 20000,     // events + stats (data bachane ke liye dheere)
+  EVENTS: 150
 };
 /* ================================================================= */
 
@@ -349,8 +368,10 @@ function readHash(){
     ACCT : p.get("a") || DEFAULTS.ACCT,
     AUTH : p.get("k") || DEFAULTS.AUTH,
     NODE : p.get("n") || DEFAULTS.NODE,
+    OPEN : parseFloat(p.get("o")) || DEFAULTS.OPEN,
     DEMO : p.get("demo") === "1",
     POLL : DEFAULTS.POLL,
+    SLOW : DEFAULTS.SLOW,
     EVENTS: DEFAULTS.EVENTS
   };
 }
@@ -360,6 +381,7 @@ function writeHash(c){
   if(c.ACCT) p.set("a", c.ACCT);
   if(c.AUTH) p.set("k", c.AUTH);
   if(c.NODE && c.NODE !== "gh") p.set("n", c.NODE);
+  if(c.OPEN && c.OPEN !== DEFAULTS.OPEN) p.set("o", String(c.OPEN));
   if(c.DEMO) p.set("demo","1");
   location.hash = p.toString();
 }
@@ -458,6 +480,7 @@ function renderLive(d){
 
   $("equity").textContent  = money(d.equity);
   $("balance").textContent = money(d.balance);
+  lastBalance = Number(d.balance || 0);
   $("pnl").textContent = money(d.pnl, true);  $("pnl").className = cls(Number(d.pnl || 0));
   $("btp").textContent = money(d.basketTP);
   $("ddPct").textContent = Number(d.ddPct || 0).toFixed(2) + "%";
@@ -467,6 +490,34 @@ function renderLive(d){
 
   renderDD(d.ddUsd, d.ddLimit, d.stage);
   banner(d.weekend ? "Weekend block active — EA holds until Monday 7:00 AM IST." : "");
+}
+
+// Total = balance - opening balance.
+// Today = aaj (local midnight ke baad) ke saare band hue cycles ka jod,
+// jo TP_HIT / CYCLE_END events ke v1 (recovery $) se nikalta hai.
+let lastBalance = null;
+
+function renderPnl(events){
+  const open = Number(CFG.OPEN || 0);
+  $("pOpen").textContent = "opening " + money(open);
+
+  if(lastBalance === null){ $("pTotal").textContent = "—"; $("pPct").textContent = "—"; }
+  else{
+    const tot = lastBalance - open;
+    $("pTotal").textContent = money(tot, true);
+    $("pTotal").className = cls(tot);
+    $("pPct").textContent = open > 0 ? (tot / open * 100).toFixed(2) + "% of opening" : "—";
+  }
+
+  const midnight = new Date(); midnight.setHours(0,0,0,0);
+  const from = Math.floor(midnight.getTime() / 1000);
+  let today = 0, n = 0;
+  (events || []).forEach(e => {
+    if((e.type === "TP_HIT" || e.type === "CYCLE_END") && e.ts >= from){ today += Number(e.v1 || 0); n++; }
+  });
+  $("pToday").textContent = money(today, true);
+  $("pToday").className = cls(today);
+  $("pToday").title = n + " cycles today";
 }
 
 function renderStats(s){
@@ -480,6 +531,7 @@ function renderStats(s){
 
 function renderEvents(obj){
   const list = obj ? Object.keys(obj).sort().reverse().map(k => obj[k]) : [];
+  renderPnl(list);
   $("evCount").textContent = list.length ? list.length + " events" : "—";
   if(!list.length){ $("feed").innerHTML = '<div class="empty">No events yet. They appear the moment the EA pushes one.</div>'; return; }
 
@@ -541,7 +593,9 @@ function demoData(){
 }
 
 /* ---------------- sync loop ---------------- */
-async function sync(){
+let evCache = null, lastSlow = 0;
+
+async function sync(full){
   $("sAcct").textContent = CFG.DEMO ? "DEMO" : (CFG.ACCT || "—");
   $("sDemo").textContent = CFG.DEMO ? "· DEMO DATA" : "";
 
@@ -556,21 +610,34 @@ async function sync(){
     banner('Not connected yet. Open ⚙ and enter your Realtime DB URL and MT5 account number.<br><button class="btn" onclick="openSheet()">OPEN SETTINGS</button>');
     return;
   }
+  // events aur stats sirf har SLOW ms pe — Firebase download bachane ke liye
+  const wantSlow = full || (Date.now() - lastSlow) >= CFG.SLOW;
   try{
-    const [live, events, stats] = await Promise.all([
-      get("/live"),
-      get("/events", 'orderBy="$key"&limitToLast=' + CFG.EVENTS),
-      get("/stats").catch(() => null)
-    ]);
+    const jobs = [get("/live")];
+    if(wantSlow){
+      jobs.push(get("/events", 'orderBy="$key"&limitToLast=' + CFG.EVENTS));
+      jobs.push(get("/stats").catch(() => null));
+    }
+    const [live, events, stats] = await Promise.all(jobs);
+
     if(!live) banner('Connected, but <code>/live</code> is empty. The EA has not pushed yet — check the URL whitelist in MT5.');
     else banner("");
-    renderLive(live); renderEvents(events); renderStats(stats); heartbeat();
+
+    renderLive(live);
+    if(wantSlow){
+      lastSlow = Date.now();
+      evCache = events;
+      renderEvents(events); renderStats(stats);
+    }else{
+      renderPnl(evCache ? Object.keys(evCache).sort().reverse().map(k => evCache[k]) : []);
+    }
+    heartbeat();
   }catch(err){
     $("dot").className = "dot off";
     banner("Can't reach the database: " + esc(err.message) + ".", true);
   }
 }
-function start(){ stop(); sync(); timer = setInterval(sync, CFG.POLL); }
+function start(){ stop(); sync(true); timer = setInterval(() => sync(false), CFG.POLL); }
 function stop(){ if(timer) clearInterval(timer); timer = null; }
 
 /* ---------------- settings sheet ---------------- */
@@ -579,6 +646,7 @@ function openSheet(){
   $("fAcct").value = CFG.ACCT === "12345678" ? "" : CFG.ACCT;
   $("fAuth").value = CFG.AUTH;
   $("fNode").value = CFG.NODE;
+  $("fOpen").value = CFG.OPEN;
   $("demoBtn").textContent = CFG.DEMO ? "DEMO OFF" : "DEMO DATA";
   $("sheet").classList.add("open");
 }
@@ -587,13 +655,14 @@ function closeSheet(){ $("sheet").classList.remove("open"); }
 $("gear").addEventListener("click", openSheet);
 $("close").addEventListener("click", closeSheet);
 $("sheet").addEventListener("click", e => { if(e.target === $("sheet")) closeSheet(); });
-$("refresh").addEventListener("click", sync);
+$("refresh").addEventListener("click", () => sync(true));
 
 $("save").addEventListener("click", () => {
   CFG.HOST = $("fHost").value.trim() || DEFAULTS.HOST;
   CFG.ACCT = $("fAcct").value.trim() || DEFAULTS.ACCT;
   CFG.AUTH = $("fAuth").value.trim();
   CFG.NODE = $("fNode").value.trim() || "gh";
+  CFG.OPEN = parseFloat($("fOpen").value.trim()) || DEFAULTS.OPEN;
   if(configured()) CFG.DEMO = false;   // real feed wins over demo
   writeHash(CFG); closeSheet(); lastTs = 0; firstLoad = true; start();
 });
