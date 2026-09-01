@@ -10,6 +10,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v1.5.2  - Opening balance ab seedha tiles grid mein (pehla tile).
+            Alag se lagayi gayi START/NET aur opening lines hata di.
+            Drawdown % tile hataya — DD $ aur DD LIMIT bar kaafi hain.
   v1.5.1  - Equity/Balance tiles ke neeche START + NET line (bold).
   v1.5.0  - Today / Total profit tiles + opening-balance setting.
             Events aur stats ab har 20s (live har 4s) — Firebase data bachta hai.
@@ -141,19 +144,15 @@ button{font-family:var(--mono);font-weight:800}
 .tile{background:linear-gradient(160deg,#161d2c,#0b1018);padding:11px 12px;position:relative}
 .tile .val{font-size:19px;margin-top:4px;letter-spacing:.02em;color:#fff;
   text-shadow:0 0 10px rgba(255,255,255,.28)}
-.tile:nth-child(1) .label{color:var(--buy)}   .tile:nth-child(2) .label{color:var(--blue)}
-.tile:nth-child(3) .label{color:var(--gold)}  .tile:nth-child(4) .label{color:var(--cyan)}
-.tile:nth-child(5) .label{color:var(--sell)}  .tile:nth-child(6) .label{color:var(--violet)}
+.tile:nth-child(1) .label{color:var(--violet)} .tile:nth-child(2) .label{color:var(--buy)}
+.tile:nth-child(3) .label{color:var(--blue)}   .tile:nth-child(4) .label{color:var(--gold)}
+.tile:nth-child(5) .label{color:var(--cyan)}   .tile:nth-child(6) .label{color:var(--sell)}
 .pos{color:var(--buy)!important;text-shadow:0 0 12px rgba(18,247,160,.6)!important}
 .neg{color:var(--sell)!important;text-shadow:0 0 12px rgba(255,79,109,.6)!important}
 
 .t-pnl .tile:nth-child(1) .label{color:var(--gold)}
 .t-pnl .tile:nth-child(2) .label{color:var(--buy)}
 .t-pnl .val{font-size:22px}
-.pnlfoot{display:flex;justify-content:space-between;margin-top:7px;padding:0 3px;
-  font-size:12px;font-weight:800;color:var(--dim)}
-.pnlfoot.strong{color:var(--cyan);text-shadow:0 0 9px rgba(62,224,255,.4)}
-.pnlfoot b{color:#fff;text-shadow:0 0 9px rgba(255,255,255,.35)}
 
 /* ---------- dd bar ---------- */
 .ddbar i{position:absolute;left:50%;top:0;bottom:0;width:2px;background:rgba(255,204,77,.6);z-index:2}
@@ -281,16 +280,12 @@ button{font-family:var(--mono);font-weight:800}
 
 <!-- MONEY -->
 <div class="tiles">
+  <div class="tile"><div class="label">Opening balance</div><div class="val" id="openBal">—</div></div>
   <div class="tile"><div class="label">Equity</div><div class="val" id="equity">—</div></div>
   <div class="tile"><div class="label">Balance</div><div class="val" id="balance">—</div></div>
   <div class="tile"><div class="label">Floating PnL</div><div class="val" id="pnl">—</div></div>
   <div class="tile"><div class="label">Basket TP</div><div class="val" id="btp">—</div></div>
-  <div class="tile"><div class="label">Drawdown %</div><div class="val" id="ddPct">—</div></div>
   <div class="tile"><div class="label">Drawdown $</div><div class="val" id="ddUsd">—</div></div>
-</div>
-
-<div class="pnlfoot strong">
-  <span id="mStart">—</span><span id="mNet">—</span>
 </div>
 
 <!-- DD LIMIT -->
@@ -308,7 +303,6 @@ button{font-family:var(--mono);font-weight:800}
   <div class="tile"><div class="label">Today</div><div class="val" id="pToday">—</div></div>
   <div class="tile"><div class="label">Total profit</div><div class="val" id="pTotal">—</div></div>
 </div>
-<div class="pnlfoot"><span id="pOpen">—</span><span id="pPct">—</span></div>
 
 <!-- STATS -->
 <div class="tiles">
@@ -324,7 +318,7 @@ button{font-family:var(--mono);font-weight:800}
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v1.5.1</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v1.5.2</p>
 
 <!-- SETTINGS -->
 <div class="sheet" id="sheet">
@@ -490,8 +484,6 @@ function renderLive(d){
   lastBalance = Number(d.balance || 0);
   $("pnl").textContent = money(d.pnl, true);  $("pnl").className = cls(Number(d.pnl || 0));
   $("btp").textContent = money(d.basketTP);
-  $("ddPct").textContent = Number(d.ddPct || 0).toFixed(2) + "%";
-  $("ddPct").className = "val" + (Number(d.ddPct || 0) > 0 ? " neg" : "");
   $("ddUsd").textContent = money(d.ddUsd);
   $("ddUsd").className = "val" + (Number(d.ddUsd || 0) > 0 ? " neg" : "");
 
@@ -506,16 +498,14 @@ let lastBalance = null;
 
 function renderPnl(events){
   const open = Number(CFG.OPEN || 0);
-  $("pOpen").textContent = "opening " + money(open);
-  $("mStart").innerHTML = "START <b>" + money(open) + "</b>";
+  $("openBal").textContent = money(open);
 
-  if(lastBalance === null){ $("pTotal").textContent = "—"; $("pPct").textContent = "—"; $("mNet").textContent = "—"; }
-  else{
+  if(lastBalance !== null){
     const tot = lastBalance - open;
     $("pTotal").textContent = money(tot, true);
     $("pTotal").className = cls(tot);
-    $("pPct").textContent = open > 0 ? (tot / open * 100).toFixed(2) + "% of opening" : "—";
-    $("mNet").innerHTML = "NET <b>" + money(tot, true) + "</b>";
+  }else{
+    $("pTotal").textContent = "—";
   }
 
   const midnight = new Date(); midnight.setHours(0,0,0,0);
