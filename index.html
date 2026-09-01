@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v1.8.0  - MULTI-ACCOUNT: live + demo (ya jitne bhi) ek saath.
+            Upar tabs mein har account ki equity/chain/status, tap karke switch.
   v1.7.0  - SIGNAL card mein STATUS row: EA ka block reason
             (WEEKEND / NEWS / SPREAD / DD LIMIT / ADX / COOLDOWN / READY).
   v1.6.0  - Chain card mein BREAKEVEN aur TP PRICE rows (average TP mode).
@@ -91,6 +93,21 @@ button{font-family:var(--mono);font-weight:800}
 .strip span{white-space:nowrap}
 .strip b{color:#fff;font-weight:800;text-shadow:0 0 8px rgba(255,255,255,.35)}
 .strip .demo{color:var(--warn)}
+
+/* ---------- account tabs ---------- */
+.tabs{display:flex;gap:6px;margin-top:10px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs:empty{display:none}
+.tab{flex:1 0 auto;min-width:44%;padding:9px 11px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--line);background:linear-gradient(160deg,#141a28,#0a0e18);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);text-align:left}
+.tab.on{border-color:var(--amber);
+  background:linear-gradient(160deg,#2a2210,#12100a);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 0 16px rgba(255,183,51,.25)}
+.tab .tname{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.tab.on .tname{color:var(--amber)}
+.tab .tval{font-size:15px;margin-top:3px;color:#fff}
+.tab .tsub{font-size:9px;letter-spacing:.1em;color:var(--dim);margin-top:2px}
 
 /* ---------- glossy card ---------- */
 .card,.tiles{
@@ -261,6 +278,8 @@ button{font-family:var(--mono);font-weight:800}
   <span class="demo" id="sDemo"></span>
 </div>
 
+<div class="tabs" id="tabs"></div>
+
 <div id="banner"></div>
 
 <!-- SIGNAL -->
@@ -336,7 +355,7 @@ button{font-family:var(--mono);font-weight:800}
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v1.7.0</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v1.8.0</p>
 
 <!-- SETTINGS -->
 <div class="sheet" id="sheet">
@@ -344,8 +363,8 @@ button{font-family:var(--mono);font-weight:800}
     <div class="spread"><span class="label">Connection</span><button class="btn" id="close" type="button">CLOSE</button></div>
     <div class="field"><span class="label">Realtime DB URL</span>
       <input id="fHost" inputmode="url" autocapitalize="off" spellcheck="false" placeholder="https://project-default-rtdb.firebaseio.com"></div>
-    <div class="field"><span class="label">MT5 account</span>
-      <input id="fAcct" inputmode="numeric" placeholder="12345678"></div>
+    <div class="field"><span class="label">MT5 accounts</span>
+      <input id="fAcct" autocapitalize="off" spellcheck="false" placeholder="433468654:LIVE, 987654321:DEMO"></div>
     <div class="field"><span class="label">Read token (optional)</span>
       <input id="fAuth" autocapitalize="off" spellcheck="false" placeholder="leave empty if .read is true"></div>
     <div class="field"><span class="label">Root node</span>
@@ -357,7 +376,7 @@ button{font-family:var(--mono);font-weight:800}
       <button class="btn" id="alertBtn" type="button">ALERTS</button>
       <button class="btn primary" id="save" type="button">SAVE</button>
     </div>
-    <p class="hint">Settings live in this page's URL, so add the app to your home screen after saving and it reopens connected. Demo data fills the screen with a fake chain so you can check the layout before the EA is wired.</p>
+    <p class="hint">Ek se zyada account comma se alag karo, aur naam dene ke liye <code>number:LABEL</code> likho. Har account ka apna MT5 terminal + EA chahiye.<br><br>Settings live in this page's URL, so add the app to your home screen after saving and it reopens connected. Demo data fills the screen with a fake chain so you can check the layout before the EA is wired.</p>
   </div>
 </div>
 
@@ -365,7 +384,7 @@ button{font-family:var(--mono);font-weight:800}
 /* ============ DEFAULTS — edit once, or use the ⚙ sheet ============ */
 const DEFAULTS = {
   HOST : "https://forexdiagnosis-default-rtdb.asia-southeast1.firebasedatabase.app",
-  ACCT : "433468654",
+  ACCT : "433468654:LIVE",   // comma se aur account jodo, jaise "111:LIVE, 222:DEMO"
   AUTH : "",
   NODE : "gh",
   OPEN : 5000,      // account ka opening balance — total profit isi se nikalta hai
@@ -385,6 +404,7 @@ function readHash(){
   return {
     HOST : p.get("h") || DEFAULTS.HOST,
     ACCT : p.get("a") || DEFAULTS.ACCT,
+    IDX  : parseInt(p.get("i")) || 0,
     AUTH : p.get("k") || DEFAULTS.AUTH,
     NODE : p.get("n") || DEFAULTS.NODE,
     OPEN : parseFloat(p.get("o")) || DEFAULTS.OPEN,
@@ -401,11 +421,24 @@ function writeHash(c){
   if(c.AUTH) p.set("k", c.AUTH);
   if(c.NODE && c.NODE !== "gh") p.set("n", c.NODE);
   if(c.OPEN && c.OPEN !== DEFAULTS.OPEN) p.set("o", String(c.OPEN));
+  if(c.IDX) p.set("i", String(c.IDX));
   if(c.DEMO) p.set("demo","1");
   location.hash = p.toString();
 }
-const configured = () => CFG.HOST && !CFG.HOST.includes("YOURPROJECT") && CFG.ACCT && CFG.ACCT !== "12345678";
-const base = () => CFG.HOST.replace(/\/+$/,"") + "/" + CFG.NODE + "/" + CFG.ACCT;
+const configured = () => CFG.HOST && !CFG.HOST.includes("YOURPROJECT") && accounts().length > 0;
+// "433468654:LIVE, 987654321:DEMO" -> [{id,label}, ...]
+function accounts(){
+  return String(CFG.ACCT || "").split(",").map(x => x.trim()).filter(Boolean).map(x => {
+    const [id, label] = x.split(":");
+    return { id: (id || "").trim(), label: (label || id || "").trim() };
+  }).filter(a => a.id);
+}
+function active(){
+  const a = accounts();
+  return a[Math.min(CFG.IDX, a.length - 1)] || { id: "", label: "" };
+}
+const baseFor = id => CFG.HOST.replace(/\/+$/,"") + "/" + CFG.NODE + "/" + id;
+const base = () => baseFor(active().id);
 const q = first => CFG.AUTH ? (first ? "?auth=" : "&auth=") + encodeURIComponent(CFG.AUTH) : "";
 
 function money(v, sign){
@@ -591,6 +624,33 @@ function alertNew(e){
     navigator.serviceWorker.ready.then(r => r.showNotification("GRIDHEDGEEA · " + e.type, {body, tag:"gh", icon:"icon.svg"})).catch(()=>{});
 }
 
+// har account ka chhota live snapshot — tabs ke liye
+async function renderTabs(){
+  const list = accounts();
+  const el = $("tabs");
+  if(list.length < 2){ el.innerHTML = ""; return; }
+
+  const snaps = await Promise.all(list.map(a =>
+    fetch(baseFor(a.id) + "/live.json" + q(true), {cache:"no-store"})
+      .then(r => r.ok ? r.json() : null).catch(() => null)
+  ));
+
+  el.innerHTML = list.map((a, i) => {
+    const d = snaps[i];
+    const eq = d ? money(d.equity) : "—";
+    const sub = d ? ((d.chain || 0) + "/" + (d.chainMax || 0) + " · " + (d.blocked || "")) : "no feed";
+    return '<div class="tab' + (i === CFG.IDX ? " on" : "") + '" data-i="' + i + '">' +
+      '<div class="tname">' + esc(a.label) + '</div>' +
+      '<div class="tval">' + eq + '</div>' +
+      '<div class="tsub">' + esc(sub) + '</div></div>';
+  }).join("");
+
+  el.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
+    CFG.IDX = Number(t.dataset.i); writeHash(CFG);
+    lastTs = 0; firstLoad = true; evCache = null; lastSlow = 0; start();
+  }));
+}
+
 function heartbeat(){
   const dot = $("dot"), age = $("age");
   if(!lastTs){ dot.className = "dot off"; age.textContent = configured() || CFG.DEMO ? "no feed" : "not set"; return; }
@@ -628,7 +688,7 @@ function demoData(){
 let evCache = null, lastSlow = 0;
 
 async function sync(full){
-  $("sAcct").textContent = CFG.DEMO ? "DEMO" : (CFG.ACCT || "—");
+  $("sAcct").textContent = CFG.DEMO ? "DEMO" : (active().id || "—");
   $("sDemo").textContent = CFG.DEMO ? "· DEMO DATA" : "";
 
   if(CFG.DEMO){
@@ -660,6 +720,7 @@ async function sync(full){
       lastSlow = Date.now();
       evCache = events;
       renderEvents(events); renderStats(stats);
+      renderTabs();
     }else{
       renderPnl(evCache ? Object.keys(evCache).sort().reverse().map(k => evCache[k]) : []);
     }
@@ -675,7 +736,7 @@ function stop(){ if(timer) clearInterval(timer); timer = null; }
 /* ---------------- settings sheet ---------------- */
 function openSheet(){
   $("fHost").value = CFG.HOST.includes("YOURPROJECT") ? "" : CFG.HOST;
-  $("fAcct").value = CFG.ACCT === "12345678" ? "" : CFG.ACCT;
+  $("fAcct").value = CFG.ACCT;
   $("fAuth").value = CFG.AUTH;
   $("fNode").value = CFG.NODE;
   $("fOpen").value = CFG.OPEN;
@@ -692,6 +753,7 @@ $("refresh").addEventListener("click", () => sync(true));
 $("save").addEventListener("click", () => {
   CFG.HOST = $("fHost").value.trim() || DEFAULTS.HOST;
   CFG.ACCT = $("fAcct").value.trim() || DEFAULTS.ACCT;
+  CFG.IDX  = 0;
   CFG.AUTH = $("fAuth").value.trim();
   CFG.NODE = $("fNode").value.trim() || "gh";
   CFG.OPEN = parseFloat($("fOpen").value.trim()) || DEFAULTS.OPEN;
