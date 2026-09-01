@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v1.5.1  - Equity/Balance tiles ke neeche START + NET line (bold).
   v1.5.0  - Today / Total profit tiles + opening-balance setting.
             Events aur stats ab har 20s (live har 4s) — Firebase data bachta hai.
   v1.4.0  - Bold + colourful theme: glossy cards, per-section accent
@@ -149,8 +150,10 @@ button{font-family:var(--mono);font-weight:800}
 .t-pnl .tile:nth-child(1) .label{color:var(--gold)}
 .t-pnl .tile:nth-child(2) .label{color:var(--buy)}
 .t-pnl .val{font-size:22px}
-.pnlfoot{display:flex;justify-content:space-between;margin-top:6px;padding:0 3px;
-  font-size:11px;color:var(--dim)}
+.pnlfoot{display:flex;justify-content:space-between;margin-top:7px;padding:0 3px;
+  font-size:12px;font-weight:800;color:var(--dim)}
+.pnlfoot.strong{color:var(--cyan);text-shadow:0 0 9px rgba(62,224,255,.4)}
+.pnlfoot b{color:#fff;text-shadow:0 0 9px rgba(255,255,255,.35)}
 
 /* ---------- dd bar ---------- */
 .ddbar i{position:absolute;left:50%;top:0;bottom:0;width:2px;background:rgba(255,204,77,.6);z-index:2}
@@ -286,6 +289,10 @@ button{font-family:var(--mono);font-weight:800}
   <div class="tile"><div class="label">Drawdown $</div><div class="val" id="ddUsd">—</div></div>
 </div>
 
+<div class="pnlfoot strong">
+  <span id="mStart">—</span><span id="mNet">—</span>
+</div>
+
 <!-- DD LIMIT -->
 <section class="card c-dd">
   <div class="spread">
@@ -317,7 +324,7 @@ button{font-family:var(--mono);font-weight:800}
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v1.5.0</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v1.5.1</p>
 
 <!-- SETTINGS -->
 <div class="sheet" id="sheet">
@@ -500,13 +507,15 @@ let lastBalance = null;
 function renderPnl(events){
   const open = Number(CFG.OPEN || 0);
   $("pOpen").textContent = "opening " + money(open);
+  $("mStart").innerHTML = "START <b>" + money(open) + "</b>";
 
-  if(lastBalance === null){ $("pTotal").textContent = "—"; $("pPct").textContent = "—"; }
+  if(lastBalance === null){ $("pTotal").textContent = "—"; $("pPct").textContent = "—"; $("mNet").textContent = "—"; }
   else{
     const tot = lastBalance - open;
     $("pTotal").textContent = money(tot, true);
     $("pTotal").className = cls(tot);
     $("pPct").textContent = open > 0 ? (tot / open * 100).toFixed(2) + "% of opening" : "—";
+    $("mNet").innerHTML = "NET <b>" + money(tot, true) + "</b>";
   }
 
   const midnight = new Date(); midnight.setHours(0,0,0,0);
