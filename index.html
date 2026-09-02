@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v1.9.2  - ORPHAN events ka apna colour.
   v1.9.1  - Dono account file mein hardcoded — home-screen se kholne pe
             hash gum ho jaata tha aur settings "remove" dikhti thi.
   v1.9.0  - Per-account opening balance (number:LABEL:OPENING).
@@ -220,6 +221,8 @@ button{font-family:var(--mono);font-weight:800}
 .t-TRADE_OPEN .ev-type{color:var(--blue)}
 .t-PENDING_SET .ev-mark{background:var(--gold)}
 .t-PENDING_SET .ev-type{color:var(--gold)}
+.t-ORPHAN .ev-mark{background:var(--violet);box-shadow:0 0 10px var(--violet)}
+.t-ORPHAN .ev-type{color:var(--violet)}
 .t-MANUAL_CLOSE .ev-mark{background:var(--warn);box-shadow:0 0 10px var(--warn)}
 .t-MANUAL_CLOSE .ev-type{color:var(--warn)}
 .t-EA_START .ev-mark,.t-EA_STOP .ev-mark{background:#4a5568}
@@ -367,7 +370,7 @@ button{font-family:var(--mono);font-weight:800}
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v1.9.1</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v1.9.2</p>
 
 <!-- SETTINGS -->
 <div class="sheet" id="sheet">
