@@ -1,8 +1,8 @@
-/* GRIDHEDGEEA Dashboard — service worker v1.9.0
+/* GRIDHEDGEEA Dashboard — service worker v1.9.1
    Network-first for the shell, cache as offline fallback.
    Firebase calls are never cached (always live data). */
 
-const CACHE = "gridhedge-v1.9.0";
+const CACHE = "gridhedge-v1.9.1";
 const SHELL = ["./", "./index.html", "./manifest.json"];
 
 self.addEventListener("install", e => {
