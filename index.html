@@ -10,6 +10,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v1.9.4  - .chop CSS add ki (class lagti thi par style thi hi nahi).
+  v1.9.3  - v2.5 EA regime sync: ADX ke saath DI/EMA/ATR filter ka
+             actual TRENDING/CHOPPY status aur active-chain chop reason.
   v1.9.2  - ORPHAN events ka apna colour.
   v1.9.1  - Dono account file mein hardcoded — home-screen se kholne pe
             hash gum ho jaata tha aur settings "remove" dikhti thi.
@@ -144,8 +147,10 @@ button{font-family:var(--mono);font-weight:800}
 .sym{font-size:12px;color:var(--cyan);letter-spacing:.1em;text-shadow:0 0 8px rgba(62,224,255,.45)}
 .statusrow{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-top:12px;
   padding-top:10px;border-top:1px solid var(--line)}
-#blocked{font-size:14px;color:var(--warn);text-shadow:0 0 10px rgba(255,204,77,.55)}
+#blocked{font-size:14px;color:var(--warn);text-shadow:0 0 10px rgba(255,204,77,.55);
+  max-width:74%;text-align:right;word-break:break-word}
 #blocked.ready{color:var(--buy);text-shadow:0 0 10px rgba(18,247,160,.6)}
+#blocked.chop{color:var(--violet);text-shadow:0 0 10px rgba(169,139,255,.6)}
 .adx-wrap{margin-top:14px}
 #adxTxt{color:#fff;text-shadow:0 0 8px rgba(255,255,255,.3)}
 .adx-bar,.ddbar{height:9px;border-radius:5px;overflow:hidden;margin-top:6px;position:relative;
@@ -370,7 +375,7 @@ button{font-family:var(--mono);font-weight:800}
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v1.9.2</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v1.9.4</p>
 
 <!-- SETTINGS -->
 <div class="sheet" id="sheet">
@@ -533,13 +538,16 @@ function renderLive(d){
   $("signal").textContent = sig;
   $("signal").className = "signal-word sig-" + (["BUY","SELL"].includes(sig) ? sig : "NONE");
 
-  // v2.0: EA seedha batata hai ki nayi chain kyun nahi khul rahi
+  // EA ka full regime reason: ADX + DI + EMA + ATR filter se aata hai.
+  // Active chain mein bhi CHOP reason dikh sakta hai jab pending cancel ho.
   const blk = d.blocked || "—";
   const bEl = $("blocked");
   bEl.textContent = (blk === "READY" || blk === "IN CHAIN")
     ? blk + (d.spread ? "  ·  spread " + d.spread : "")
     : blk;
-  bEl.className = (blk === "READY" || blk === "IN CHAIN") ? "ready" : "";
+  const isReady = blk === "READY" || blk === "IN CHAIN";
+  const isChop = /CHOP|ADX FLAT|DI NOT|EMA FLAT|PRICE IN RANGE/i.test(blk);
+  bEl.className = isReady ? "ready" : isChop ? "chop" : "";
 
   const adx = Number(d.adx || 0);
   $("adxTxt").textContent = adx.toFixed(1) + " · " + (d.trending ? "TRENDING" : "CHOPPY");
@@ -576,7 +584,11 @@ function renderLive(d){
   $("ddUsd").className = "val" + (Number(d.ddUsd || 0) > 0 ? " neg" : "");
 
   renderDD(d.ddUsd, d.ddLimit, d.stage);
-  banner(d.weekend ? "Weekend block active — EA holds until Monday 7:00 AM IST." : "");
+  banner(d.weekend
+    ? "Weekend block active — EA holds until Monday 7:00 AM IST."
+    : isChop
+      ? "Chop filter active — no new trade/pending continuation is allowed."
+      : "");
 }
 
 // Total = balance - opening balance.
@@ -709,7 +721,7 @@ function demoData(){
   const drift = Math.sin(demoTick / 6) * 18;
   const now = Math.floor(Date.now()/1000);
   const live = {
-    ts: now, sym:"XAUUSDm", ver:"1.00", signal:"BUY", adx: 27.4 + Math.sin(demoTick/9)*4,
+    ts: now, sym:"XAUUSDm", ver:"2.50", signal:"BUY", adx: 27.4 + Math.sin(demoTick/9)*4,
     trending:true, blocked:"IN CHAIN", spread:26, chain:4, chainMax:12, lastDir:"SELL", lastPrice:3412.55,
     pending:"BUY STOP 3421.30", balance:1000, equity:1000 - 46.2 + drift,
     pnl:-46.2 + drift, basketTP:18.5, ddPct:4.62, ddUsd:46.2, stage:"WARNING", weekend:false
