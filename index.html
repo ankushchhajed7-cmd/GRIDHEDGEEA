@@ -10,6 +10,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v2.0.0  - DRAWDOWN HISTORY: 30 din ka daily highest DD % ka chart,
+            worst/avg line, aur pichhle 3 mahine ka highest DD.
+            Naya mahina apne aap 0 se shuru hota hai.
   v1.9.4  - .chop CSS add ki (class lagti thi par style thi hi nahi).
   v1.9.3  - v2.5 EA regime sync: ADX ke saath DI/EMA/ATR filter ka
              actual TRENDING/CHOPPY status aur active-chain chop reason.
@@ -201,6 +204,20 @@ button{font-family:var(--mono);font-weight:800}
 .ddfoot{display:flex;justify-content:space-between;margin-top:7px;font-size:11px;color:var(--dim)}
 #ddState{color:#fff;text-shadow:0 0 10px rgba(255,255,255,.4)}
 
+/* ---------- dd history ---------- */
+.ddchart{display:flex;align-items:flex-end;gap:2px;height:86px;margin-top:12px;
+  padding:6px 4px;border-radius:6px;background:#0a0e18;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.7)}
+.ddbarv{flex:1;min-width:3px;border-radius:2px 2px 0 0;background:linear-gradient(180deg,#12f7a0,#0a8f5e)}
+.ddbarv.mid{background:linear-gradient(180deg,#ffd166,#c98a10)}
+.ddbarv.hi{background:linear-gradient(180deg,#ff4f6d,#a3122e);box-shadow:0 0 8px rgba(255,79,109,.6)}
+.ddbarv.none{background:#1a2230}
+.ddmonths{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.ddmon{flex:1 0 auto;min-width:30%;padding:8px 9px;border-radius:6px;
+  border:1px solid var(--line);background:linear-gradient(160deg,#141a28,#0a0e18)}
+.ddmon .mk{font-size:9px;letter-spacing:.14em;color:var(--dim)}
+.ddmon .mv{font-size:15px;margin-top:2px;color:var(--sell)}
+
 /* ---------- feed ---------- */
 .ev{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #1d2534}
 .ev:last-child{border-bottom:none}
@@ -369,13 +386,24 @@ button{font-family:var(--mono);font-weight:800}
   <div class="tile"><div class="label">Closed profit</div><div class="val" id="tprofit">—</div></div>
 </div>
 
+<!-- DRAWDOWN HISTORY -->
+<section class="card c-dd">
+  <div class="spread">
+    <span class="label">Drawdown · 30 days</span>
+    <span id="ddMonthMax">—</span>
+  </div>
+  <div class="ddchart" id="ddChart"></div>
+  <div class="ddfoot"><span id="ddWorstDay">—</span><span id="ddAvg">—</span></div>
+  <div class="ddmonths" id="ddMonths"></div>
+</section>
+
 <!-- FEED -->
 <section class="card c-feed feed">
   <div class="spread"><span class="label">Activity</span><span class="age" id="evCount">—</span></div>
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v1.9.4</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v2.0.0</p>
 
 <!-- SETTINGS -->
 <div class="sheet" id="sheet">
@@ -628,6 +656,56 @@ function renderStats(s){
   $("tprofit").className    = cls(Number(s.profit || 0));
 }
 
+// v2.0.0: 30 din ka daily highest DD (%) + mahine ka highest.
+// EA har naya peak Firebase pe /dd/{YYYY-MM-DD} aur /ddm/{YYYY-MM} pe likhta hai.
+function renderDDHistory(days, months){
+  const el = $("ddChart");
+
+  // aaj se peeche 30 din ka frame, jis din data nahi us din khali bar
+  const keys = [];
+  for(let i = 29; i >= 0; i--){
+    const d = new Date(); d.setDate(d.getDate() - i);
+    keys.push(d.getFullYear() + "-" +
+      String(d.getMonth() + 1).padStart(2, "0") + "-" +
+      String(d.getDate()).padStart(2, "0"));
+  }
+
+  const vals = keys.map(k => (days && days[k]) ? Number(days[k].pct || 0) : null);
+  const known = vals.filter(v => v !== null);
+  const peak = Math.max(1, ...known.map(v => v));
+
+  el.innerHTML = keys.map((k, i) => {
+    const v = vals[i];
+    if(v === null) return '<div class="ddbarv none" style="height:3px" title="' + k + ': no data"></div>';
+    const h = Math.max(3, v / peak * 74);
+    const cls = v >= peak * 0.75 ? "hi" : v >= peak * 0.4 ? "mid" : "";
+    return '<div class="ddbarv ' + cls + '" style="height:' + h.toFixed(0) + 'px" title="' +
+      k + ': ' + v.toFixed(2) + '%"></div>';
+  }).join("");
+
+  if(known.length){
+    const worst = Math.max(...known);
+    const wi = vals.indexOf(worst);
+    const avg = known.reduce((a, b) => a + b, 0) / known.length;
+    $("ddWorstDay").textContent = "worst " + worst.toFixed(2) + "% (" + keys[wi].slice(5) + ")";
+    $("ddAvg").textContent = "avg " + avg.toFixed(2) + "% · " + known.length + " days";
+  }else{
+    $("ddWorstDay").textContent = "no data yet";
+    $("ddAvg").textContent = "—";
+  }
+
+  // aaj ka mahina + pichhle mahine
+  const mk = months ? Object.keys(months).sort().reverse().slice(0, 3) : [];
+  $("ddMonths").innerHTML = mk.map(m =>
+    '<div class="ddmon"><div class="mk">' + m + '</div><div class="mv">' +
+    Number(months[m].pct || 0).toFixed(2) + '%</div></div>').join("");
+
+  const nowKey = new Date().getFullYear() + "-" + String(new Date().getMonth() + 1).padStart(2, "0");
+  $("ddMonthMax").textContent = (months && months[nowKey])
+    ? "month max " + Number(months[nowKey].pct || 0).toFixed(2) + "%"
+    : "—";
+}
+
 function renderEvents(obj){
   const list = obj ? Object.keys(obj).sort().reverse().map(k => obj[k]) : [];
   renderPnl(list);
@@ -764,8 +842,10 @@ async function sync(full){
     if(wantSlow){
       jobs.push(get("/events", 'orderBy="$key"&limitToLast=' + CFG.EVENTS));
       jobs.push(get("/stats").catch(() => null));
+      jobs.push(get("/dd",  'orderBy="$key"&limitToLast=35').catch(() => null));
+      jobs.push(get("/ddm", 'orderBy="$key"&limitToLast=6').catch(() => null));
     }
-    const [live, events, stats] = await Promise.all(jobs);
+    const [live, events, stats, ddDays, ddMonths] = await Promise.all(jobs);
 
     if(!live) banner('Connected, but <code>/live</code> is empty. The EA has not pushed yet — check the URL whitelist in MT5.');
     else banner("");
@@ -775,6 +855,7 @@ async function sync(full){
       lastSlow = Date.now();
       evCache = events;
       renderEvents(events); renderStats(stats);
+      renderDDHistory(ddDays, ddMonths);
       renderTabs();
     }else{
       renderPnl(evCache ? Object.keys(evCache).sort().reverse().map(k => evCache[k]) : []);
