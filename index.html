@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!--
   GRIDHEDGEEA Mobile Dashboard
+  v2.1.0  - TODAY tile ab EA ka daily target dikhata hai (x / target, DONE).
+            DAY_TARGET event ka apna colour.
   v2.0.0  - DRAWDOWN HISTORY: 30 din ka daily highest DD % ka chart,
             worst/avg line, aur pichhle 3 mahine ka highest DD.
             Naya mahina apne aap 0 se shuru hota hai.
@@ -243,6 +245,8 @@ button{font-family:var(--mono);font-weight:800}
 .t-TRADE_OPEN .ev-type{color:var(--blue)}
 .t-PENDING_SET .ev-mark{background:var(--gold)}
 .t-PENDING_SET .ev-type{color:var(--gold)}
+.t-DAY_TARGET .ev-mark{background:var(--buy);box-shadow:0 0 10px var(--buy)}
+.t-DAY_TARGET .ev-type{color:var(--buy)}
 .t-ORPHAN .ev-mark{background:var(--violet);box-shadow:0 0 10px var(--violet)}
 .t-ORPHAN .ev-type{color:var(--violet)}
 .t-MANUAL_CLOSE .ev-mark{background:var(--warn);box-shadow:0 0 10px var(--warn)}
@@ -403,7 +407,7 @@ button{font-family:var(--mono);font-weight:800}
   <div id="feed"><div class="empty">Waiting for the first event.</div></div>
 </section>
 
-<p class="foot">GRIDHEDGEEA DASHBOARD v2.0.0</p>
+<p class="foot">GRIDHEDGEEA DASHBOARD v2.1.0</p>
 
 <!-- SETTINGS -->
 <div class="sheet" id="sheet">
@@ -568,6 +572,9 @@ function renderLive(d){
 
   // EA ka full regime reason: ADX + DI + EMA + ATR filter se aata hai.
   // Active chain mein bhi CHOP reason dikh sakta hai jab pending cancel ho.
+  // v2.1.0: daily target progress (EA se aata hai)
+  dayTargetInfo = { pnl: Number(d.dayPnL || 0), target: Number(d.dayTarget || 0), has: Number(d.dayTarget || 0) > 0 };
+
   const blk = d.blocked || "—";
   const bEl = $("blocked");
   bEl.textContent = (blk === "READY" || blk === "IN CHAIN")
@@ -623,6 +630,7 @@ function renderLive(d){
 // Today = aaj (local midnight ke baad) ke saare band hue cycles ka jod,
 // jo TP_HIT / CYCLE_END events ke v1 (recovery $) se nikalta hai.
 let lastBalance = null;
+let dayTargetInfo = { pnl: 0, target: 0, has: false };
 
 function renderPnl(events){
   const open = openBalance();
@@ -642,8 +650,18 @@ function renderPnl(events){
   (events || []).forEach(e => {
     if((e.type === "TP_HIT" || e.type === "CYCLE_END") && e.ts >= from){ today += Number(e.v1 || 0); n++; }
   });
-  $("pToday").textContent = money(today, true);
-  $("pToday").className = cls(today);
+  // EA target de raha ho to uska apna dayPnL zyada bharosemand hai
+  const useEA = dayTargetInfo.has;
+  const shown = useEA ? dayTargetInfo.pnl : today;
+
+  let html = money(shown, true);
+  if(useEA){
+    html += ' <span style="font-size:11px;color:var(--dim)">/ ' + dayTargetInfo.target.toFixed(0) + '</span>';
+    if(shown >= dayTargetInfo.target)
+      html += ' <span style="font-size:10px;color:var(--buy)">DONE</span>';
+  }
+  $("pToday").innerHTML = html;
+  $("pToday").className = cls(shown);
   $("pToday").title = n + " cycles today";
 }
 
